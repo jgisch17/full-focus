@@ -338,6 +338,59 @@
                 flex-wrap: wrap;
             }
         }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 14px 16px;
+            }
+            .header h1 {
+                font-size: 18px;
+            }
+            .header p {
+                font-size: 11px;
+            }
+            .tabs {
+                padding: 0 8px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .tab {
+                padding: 12px 14px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+            .content {
+                padding: 16px;
+            }
+            .metrics-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+            .metric-card {
+                padding: 16px;
+            }
+            .metric-value {
+                font-size: 22px;
+            }
+            .tab-filters {
+                gap: 10px;
+                padding: 12px;
+            }
+            .search-box {
+                max-width: 100% !important;
+            }
+            .chart-container {
+                padding: 12px;
+            }
+            .chart-grid-2col {
+                grid-template-columns: 1fr !important;
+            }
+            .multi-select {
+                min-width: 130px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -593,12 +646,14 @@
                 <div class="chart-title">📊 Monthly Performance Metrics</div>
                 <canvas id="performanceChart"></canvas>
             </div>
+            <div style="overflow-x:auto;">
             <table id="performanceTable">
                 <thead>
                     <tr id="performanceTableHeader"></tr>
                 </thead>
                 <tbody id="performanceTableBody"></tbody>
             </table>
+            </div>
         </div>
 
         <!-- Campaigns Tab -->
@@ -656,12 +711,14 @@
                 </select>
             </div>
             <input type="text" class="search-box" id="campaignSearch" placeholder="🔍 Search campaigns...">
+            <div style="overflow-x:auto;">
             <table id="campaignTable">
                 <thead>
                     <tr id="campaignTableHeader"></tr>
                 </thead>
                 <tbody id="campaignTableBody"></tbody>
             </table>
+            </div>
         </div>
 
         <!-- SKUs Tab -->
@@ -719,12 +776,14 @@
                 </select>
             </div>
             <input type="text" class="search-box" id="skuSearch" placeholder="🔍 Search SKUs...">
+            <div style="overflow-x:auto;">
             <table id="skuTable">
                 <thead>
                     <tr id="skuTableHeader"></tr>
                 </thead>
                 <tbody id="skuTableBody"></tbody>
             </table>
+            </div>
         </div>
 
         <!-- Search Terms Tab -->
@@ -797,7 +856,7 @@
             <div id="stKpiTiles" style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;"></div>
 
             <!-- Summary Charts -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+            <div class="chart-grid-2col" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
                 <div class="chart-container" style="padding:16px;">
                     <div class="chart-title">📊 Top 15 Keywords by Spend</div>
                     <canvas id="stSpendChart"></canvas>
@@ -823,12 +882,14 @@
                 <span>⚪ No Sales</span>
             </div>
 
+            <div style="overflow-x:auto;">
             <table id="termTable">
                 <thead>
                     <tr id="termTableHeader"></tr>
                 </thead>
                 <tbody id="termTableBody"></tbody>
             </table>
+            </div>
             <div id="stPagination"></div>
         </div>
 
@@ -1092,7 +1153,7 @@
             </div>
 
             <!-- Row 1: SP vs SB Monthly + Strategy Monthly -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+            <div class="chart-grid-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
                 <div class="chart-container">
                     <h3>SP vs. SB Spend by Month</h3>
                     <div style="position:relative;height:260px;"><canvas id="adTypeMonthlyChart"></canvas></div>
@@ -1104,7 +1165,7 @@
             </div>
 
             <!-- Row 2: Strategy Spend + Strategy ROAS -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+            <div class="chart-grid-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
                 <div class="chart-container">
                     <h3>Strategy Spend by Month</h3>
                     <div style="position:relative;height:280px;"><canvas id="strategySpendChart"></canvas></div>
@@ -1116,7 +1177,7 @@
             </div>
 
             <!-- Row 3: Match Type Spend + Match Type ROAS -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+            <div class="chart-grid-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
                 <div class="chart-container">
                     <h3>Match Type Spend by Month</h3>
                     <div style="position:relative;height:260px;"><canvas id="matchSpendChart"></canvas></div>
@@ -1128,7 +1189,7 @@
             </div>
 
             <!-- Row 4: Strategy by Product Group + Match by Product Group -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+            <div class="chart-grid-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
                 <div class="chart-container">
                     <h3>Strategy Spend by Product Group</h3>
                     <div style="position:relative;height:280px;"><canvas id="strategyGroupChart"></canvas></div>
@@ -1171,8 +1232,8 @@
                     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                     tab.classList.add('active');
                     document.getElementById(tab.dataset.tab).classList.add('active');
-                    if (tab.dataset.tab === 'annual-plan') { renderAnnualPlanTable(); renderAnnualPlanCharts(); }
-                    if (tab.dataset.tab === 'dow-analysis') renderDowTab();
+                    activeTab = tab.dataset.tab;
+                    renderActiveTabCharts(activeTab);
                 });
             });
 
@@ -2337,6 +2398,19 @@ function renderCampaignTargetingTab() {
 
 
 
+        let activeTab = 'overview';
+
+        function renderActiveTabCharts(tabName) {
+            if (tabName === 'business-performance') { renderPerformanceTable(); renderPerformanceChart(); }
+            else if (tabName === 'cac-analysis') { renderCACScatterChart(); populateCACASINSelect(); renderCACTrendChart(); }
+            else if (tabName === 'campaign-targeting') { renderCampaignTargetingTab(); }
+            else if (tabName === 'campaigns') { renderCampaignTable(); }
+            else if (tabName === 'skus') { renderSKUTable(); }
+            else if (tabName === 'search-terms') { renderSearchTermTable(); }
+            else if (tabName === 'annual-plan') { renderAnnualPlanTable(); renderAnnualPlanCharts(); }
+            else if (tabName === 'dow-analysis') { renderDowTab(); }
+        }
+
         function renderDashboard() {
             updateMetrics();
             renderTrendChart();
@@ -2344,18 +2418,7 @@ function renderCampaignTargetingTab() {
             renderConversionFunnelChart();
             renderTopASINsChart();
             renderEfficiencyScatterChart();
-            renderCampaignTable();
-            renderSKUTable();
-            renderSearchTermTable();
-            renderPerformanceTable();
-            renderPerformanceChart();
-            renderCACScatterChart();
-            populateCACASINSelect();
-            renderCACTrendChart();
-            renderCampaignTargetingTab();
-            renderAnnualPlanTable();
-            renderAnnualPlanCharts();
-            renderDowTab();
+            renderActiveTabCharts(activeTab);
         }
 
         function updateMetrics() {
