@@ -1,0 +1,5 @@
+*.xlsx
+*.bak
+build_dashboard_data.py
+._*
+.DS_Store

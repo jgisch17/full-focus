@@ -1,0 +1,87 @@
+# Full Focus — Amazon Advertising Analytics Project
+
+Full Focus is an Amazon seller account. This project contains a browser-based analytics dashboard and the Python pipeline that builds its data from Amazon Advertising CSV exports.
+
+## Project Structure
+
+```
+FullFocus/
+├── index.html                          # Amazon Analytics Dashboard (open in browser)
+├── dashboard-data.js                   # Generated data file — do not hand-edit
+├── build_dashboard_data.py             # Python script that builds dashboard-data.js
+└── FullFocus_SKU_Group_Mapping (1).xlsx  # SKU/ASIN → Product Name + Group mapping
+```
+
+## How to Rebuild the Dashboard Data
+
+1. Download the latest Amazon Advertising CSV exports into `~/Downloads/`
+2. Update the `FILES` list in `build_dashboard_data.py` if new files were added
+3. Run:
+   ```bash
+   python3 "/Volumes/GISCH SSD/CLAUDE/FullFocus/build_dashboard_data.py"
+   ```
+4. Open `index.html` in a browser — it reads `dashboard-data.js` from the same folder
+
+**Dependencies:** `openpyxl` (`pip install openpyxl`)
+
+## Input CSV Files
+
+Located in `~/Downloads/`. The `FILES` list in `build_dashboard_data.py` maps each file to its granularity:
+
+| File | Granularity |
+|------|-------------|
+| `jan25.csv` | Monthly |
+| `FullFocusAdsfeb-may25.csv` | Daily |
+| `FullFocusAdsjun-aug25.csv` | Daily |
+| `FullFocusAdssep-nov25_Copy.csv` | Daily |
+| `FullFocusAdsDec25-feb26_Copy.csv` | Daily |
+| `FullFocusAdsMar26.csv` | Daily |
+
+When new monthly exports arrive, add them to `FILES` with `"monthly"` or `"daily"` as appropriate.
+
+## Product Mapping
+
+`FullFocus_SKU_Group_Mapping (1).xlsx` maps each SKU and ASIN to a human-readable **Product Name** and **Product Group**. The script looks up SKU first, then ASIN. Campaigns with no SKU/ASIN match are bucketed into `SB Video` or `SB Campaigns` based on campaign name patterns.
+
+To add new products: add rows to the Excel file (columns: SKU, ASIN, Product Name, Product Group).
+
+## Ad Strategy Classification
+
+The script classifies campaigns into these strategies automatically from the campaign name:
+
+| Strategy | Pattern |
+|----------|---------|
+| `Auto SP` | `SP-A`, `AUTO` in name |
+| `Manual SP - COMP` | `COMPETITOR`, `OFFENSIVE`, `PT TO CATEGORY` |
+| `Manual SP - NB` | `NON-BRANDED`, `NON-BRAND` |
+| `Manual SP - BR` | `BRANDED`, `DEFENSIVE-PAT` |
+| `SB - BR` | Sponsored Brands (branded) |
+| `SB - NB` | Sponsored Brands with `NON-BRANDED`/`NON-BRAND` |
+| `SB Video` | `SBV` or `VIDEO` in name |
+| `SD` | Sponsored Display |
+
+## Dashboard Data Arrays
+
+`dashboard-data.js` exports a single `dashboardData` object with these arrays:
+
+| Key | Description |
+|-----|-------------|
+| `campaign_data` | Per-campaign monthly rows |
+| `sku_data` | Per-SKU monthly rows |
+| `search_term_data` | Top 500 terms by lifetime spend, monthly |
+| `asin_performance` | Monthly per-SKU with CAC |
+| `time_series` | Monthly ad totals (ROAS, CAC, CTR) |
+| `daily_series` / `weekly_series` | Daily/weekly ad totals |
+| `daily_asin_series` / `weekly_asin_series` | Daily/weekly per-SKU |
+| `ad_type_monthly` | SP / SB / SD breakdown by month |
+| `strategy_monthly` / `strategy_daily` / `strategy_weekly` | By strategy |
+| `match_monthly` | By match type (Exact/Phrase/Broad/PAT/Auto) |
+| `strategy_by_group` / `match_by_group` | Lifetime cross-tabs |
+| `dow_summary` | Day-of-week performance averages |
+
+## Important Notes
+
+- `dashboard-data.js` is generated — always rebuild via `build_dashboard_data.py`, never edit manually
+- `Shipped COGS` and `Shipped Revenue` in `time_series` are currently `0` — populate from business data when available
+- The search term table is capped at the top 500 terms by lifetime spend to keep file size manageable
+- No web server needed; `index.html` loads `dashboard-data.js` from the same directory
