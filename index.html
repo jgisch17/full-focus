@@ -524,6 +524,7 @@
                             <option value="Clicks">Clicks</option>
                             <option value="CTR">CTR (%)</option>
                             <option value="CAC">CAC</option>
+                            <option value="CPC">CPC</option>
                         </select>
                         <label style="font-size: 12px; color: #764ba2;">Metric 2:</label>
                         <select id="metric2Select">
@@ -538,6 +539,7 @@
                             <option value="Clicks">Clicks</option>
                             <option value="CTR">CTR (%)</option>
                             <option value="CAC">CAC</option>
+                            <option value="CPC">CPC</option>
                         </select>
                         <label style="font-size: 12px; color: #f59e0b;">Metric 3:</label>
                         <select id="metric3Select">
@@ -552,6 +554,7 @@
                             <option value="Clicks">Clicks</option>
                             <option value="CTR">CTR (%)</option>
                             <option value="CAC">CAC</option>
+                            <option value="CPC">CPC</option>
                         </select>
                     </div>
                 </div>
@@ -708,6 +711,12 @@
                 <select id="campaignAggregation" onchange="renderCampaignTable()">
                     <option value="campaign">By Campaign</option>
                     <option value="group">By Product Group</option>
+                </select>
+                <label style="margin-left: 15px;">Keyword Type:</label>
+                <select id="campaignBrandFilter" onchange="renderCampaignTable()" style="padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
+                    <option value="all">All Keywords</option>
+                    <option value="branded">Branded Only</option>
+                    <option value="nonbranded">Non-Branded Only</option>
                 </select>
             </div>
             <input type="text" class="search-box" id="campaignSearch" placeholder="🔍 Search campaigns...">
@@ -2537,7 +2546,7 @@ function renderCampaignTargetingTab() {
             const colors = ['#667eea', '#764ba2', '#f59e0b'];
             
             // Metrics that should use the right axis (percentages and ratios)
-            const rightAxisMetrics = ['TACoS', 'ROAS', 'CTR', 'CAC'];
+            const rightAxisMetrics = ['TACoS', 'ROAS', 'CTR', 'CAC', 'CPC'];
 
             [metric1, metric2, metric3].forEach((metric, i) => {
                 if (metric) {
@@ -2553,6 +2562,7 @@ function renderCampaignTargetingTab() {
                         if (m === 'ROAS')  return (d.spend > 0) ? d.sales / d.spend : 0;
                         if (m === 'CAC')   return (d.purchases > 0) ? d.spend / d.purchases : 0;
                         if (m === 'CTR')   return (d.impressions > 0) ? (d.clicks / d.impressions * 100) : 0;
+                        if (m === 'CPC')   return (d.clicks > 0) ? d.spend / d.clicks : 0;
                         // Metrics requiring monthly data only (TACoS, Shipped Revenue, Shipped COGS)
                         return null;
                     };
@@ -3391,6 +3401,7 @@ function renderCampaignTargetingTab() {
             totals.ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions * 100) : 0;
             totals.roas = totals.spend > 0 ? (totals.sales / totals.spend) : 0;
             totals.cac = totals.purchases > 0 ? (totals.spend / totals.purchases) : 0;
+            totals.cpc = totals.clicks > 0 ? (totals.spend / totals.clicks) : 0;
             
             // Create totals row
             const tr = document.createElement('tr');
@@ -3420,7 +3431,10 @@ function renderCampaignTargetingTab() {
             if (tableType !== 'performance') {
                 rowHTML += `<td>$${totals.cac.toFixed(2)}</td>`;
             }
-            
+            if (tableType === 'campaign') {
+                rowHTML += `<td>$${totals.cpc.toFixed(2)}</td>`;
+            }
+
             tr.innerHTML = rowHTML;
             tbody.insertBefore(tr, tbody.firstChild);
         }
@@ -3433,6 +3447,18 @@ function renderCampaignTargetingTab() {
             let data = filtered.campaigns;
             if (!groups.includes('all')) {
                 data = data.filter(d => groups.includes(d['Product Group']));
+            }
+
+            const campaignBrandFilter = document.getElementById('campaignBrandFilter') ? document.getElementById('campaignBrandFilter').value : 'all';
+            const brandedTermsCamp = ['full focus', 'michael hyatt'];
+            function isBrandedCampaign(name) {
+                const n = (name || '').toLowerCase();
+                return brandedTermsCamp.some(b => n.includes(b));
+            }
+            if (campaignBrandFilter === 'branded') {
+                data = data.filter(d => isBrandedCampaign(d['Campaign name']));
+            } else if (campaignBrandFilter === 'nonbranded') {
+                data = data.filter(d => !isBrandedCampaign(d['Campaign name']));
             }
 
             let aggregatedData = [];
@@ -3470,7 +3496,8 @@ function renderCampaignTargetingTab() {
                     Sales: d.sales,
                     Purchases: d.purchases,
                     ROAS: d.spend > 0 ? (d.sales / d.spend) : 0,
-                    CAC: d.purchases > 0 ? (d.spend / d.purchases) : 0
+                    CAC: d.purchases > 0 ? (d.spend / d.purchases) : 0,
+                    CPC: d.clicks > 0 ? (d.spend / d.clicks) : 0
                 }));
             }
 
@@ -3487,6 +3514,7 @@ function renderCampaignTargetingTab() {
                 <th onclick="sortTable('campaignTable', ${aggregation !== 'group' ? 7 : 6})">Purchases</th>
                 <th onclick="sortTable('campaignTable', ${aggregation !== 'group' ? 8 : 7})">ROAS</th>
                 <th onclick="sortTable('campaignTable', ${aggregation !== 'group' ? 9 : 8})">CAC</th>
+                <th onclick="sortTable('campaignTable', ${aggregation !== 'group' ? 10 : 9})">CPC</th>
             `;
 
             const tbody = document.getElementById('campaignTableBody');
@@ -3505,10 +3533,11 @@ function renderCampaignTargetingTab() {
                     <td>${row.Purchases.toLocaleString()}</td>
                     <td>${row.ROAS.toFixed(2)}x</td>
                     <td>$${row.CAC.toFixed(2)}</td>
+                    <td>$${row.CPC.toFixed(2)}</td>
                 `;
                 tbody.appendChild(tr);
             });
-            
+
             // Add totals row at the top
             if (aggregatedData.length > 0) {
                 addTotalsRow(tbody, aggregatedData, aggregation, 'campaign');
@@ -3949,20 +3978,24 @@ function renderCampaignTargetingTab() {
                     <th>Sales</th>
                     <th>Purchases</th>
                     <th>ROAS</th>
+                    <th>CPC</th>
                 `;
                 // Totals row (always shows full dataset totals)
                 const totTr = document.createElement('tr');
                 totTr.style.fontWeight = '600';
                 totTr.style.background = '#f0f2ff';
+                const _totClicks = tableData.reduce((s,t)=>s+t.clicks,0);
+                const _totSpend  = tableData.reduce((s,t)=>s+t.spend,0);
                 totTr.innerHTML = `
                     <td></td><td>TOTAL (${tableData.length.toLocaleString()} keywords)</td><td></td>
                     <td>${tableData.reduce((s,t)=>s+t.impressions,0).toLocaleString()}</td>
-                    <td>${tableData.reduce((s,t)=>s+t.clicks,0).toLocaleString()}</td>
-                    <td>${tableData.reduce((s,t)=>s+t.impressions,0)>0?(tableData.reduce((s,t)=>s+t.clicks,0)/tableData.reduce((s,t)=>s+t.impressions,0)*100).toFixed(2):'0.00'}%</td>
-                    <td>$${tableData.reduce((s,t)=>s+t.spend,0).toLocaleString('en-US',{maximumFractionDigits:2})}</td>
+                    <td>${_totClicks.toLocaleString()}</td>
+                    <td>${tableData.reduce((s,t)=>s+t.impressions,0)>0?(_totClicks/tableData.reduce((s,t)=>s+t.impressions,0)*100).toFixed(2):'0.00'}%</td>
+                    <td>$${_totSpend.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                     <td>$${tableData.reduce((s,t)=>s+t.sales,0).toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                     <td>${tableData.reduce((s,t)=>s+t.purchases,0).toLocaleString()}</td>
-                    <td>${(tableData.reduce((s,t)=>s+t.spend,0)>0?(tableData.reduce((s,t)=>s+t.sales,0)/tableData.reduce((s,t)=>s+t.spend,0)):0).toFixed(2)}x</td>
+                    <td>${(_totSpend>0?(tableData.reduce((s,t)=>s+t.sales,0)/_totSpend):0).toFixed(2)}x</td>
+                    <td>$${(_totClicks>0?(_totSpend/_totClicks):0).toFixed(2)}</td>
                 `;
                 tbody.appendChild(totTr);
                 stPageData.forEach(row => {
@@ -3978,6 +4011,7 @@ function renderCampaignTargetingTab() {
                         <td>$${row.sales.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                         <td>${row.purchases.toLocaleString()}</td>
                         <td>${row.roas.toFixed(2)}x</td>
+                        <td>$${(row.clicks>0?row.spend/row.clicks:0).toFixed(2)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -4005,7 +4039,7 @@ function renderCampaignTargetingTab() {
                 if (stPage > stTotalPagesA) stPage = stTotalPagesA;
                 const stPageDataA = tableData.slice((stPage-1)*ST_PAGE_SIZE_A, stPage*ST_PAGE_SIZE_A);
                 document.getElementById('termCount').textContent = (stPageDataA.length + ' of ' + tableData.length.toLocaleString());
-                header.innerHTML = `<th>Perf</th><th>ASIN</th><th>Product Group</th><th>Keywords</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend</th><th>Sales</th><th>Purchases</th><th>ROAS</th>`;
+                header.innerHTML = `<th>Perf</th><th>ASIN</th><th>Product Group</th><th>Keywords</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend</th><th>Sales</th><th>Purchases</th><th>ROAS</th><th>CPC</th>`;
                 stPageDataA.forEach(row => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
@@ -4015,6 +4049,7 @@ function renderCampaignTargetingTab() {
                         <td>$${row.spend.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                         <td>$${row.sales.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                         <td>${row.purchases.toLocaleString()}</td><td>${row.roas.toFixed(2)}x</td>
+                        <td>$${(row.clicks>0?row.spend/row.clicks:0).toFixed(2)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -4041,7 +4076,7 @@ function renderCampaignTargetingTab() {
                 const sortFns3 = { spend:(a,b)=>b.spend-a.spend, sales:(a,b)=>b.sales-a.sales, purchases:(a,b)=>b.purchases-a.purchases, roas:(a,b)=>b.roas-a.roas, impressions:(a,b)=>b.impressions-a.impressions, ctr:(a,b)=>b.ctr-a.ctr };
                 tableData.sort(sortFns3[sortBy] || sortFns3.spend);
                 document.getElementById('termCount').textContent = tableData.length.toLocaleString();
-                header.innerHTML = `<th style="width:36px;"></th><th>Product Group</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend</th><th>Sales</th><th>Purchases</th><th>ROAS</th>`;
+                header.innerHTML = `<th style="width:36px;"></th><th>Product Group</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend</th><th>Sales</th><th>Purchases</th><th>ROAS</th><th>CPC</th>`;
                 tableData.forEach((row, rowIdx) => {
                     const expandId = 'term-expand-' + rowIdx;
                     const tr = document.createElement('tr');
@@ -4053,6 +4088,7 @@ function renderCampaignTargetingTab() {
                         <td>$${row.spend.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                         <td>$${row.sales.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                         <td>${row.purchases.toLocaleString()}</td><td>${row.roas.toFixed(2)}x</td>
+                        <td>$${(row.clicks>0?row.spend/row.clicks:0).toFixed(2)}</td>
                     `;
                     // Aggregate top 10 keywords for this group
                     const grpTermAgg = {};
@@ -4078,7 +4114,7 @@ function renderCampaignTargetingTab() {
                     const expandTr = document.createElement('tr');
                     expandTr.id = expandId; expandTr.style.display = 'none';
                     const expandTd = document.createElement('td');
-                    expandTd.colSpan = 9; expandTd.style.padding = '0 0 0 36px'; expandTd.style.background = '#f8f9ff';
+                    expandTd.colSpan = 10; expandTd.style.padding = '0 0 0 36px'; expandTd.style.background = '#f8f9ff';
                     expandTd.innerHTML = top10.length === 0 ? '<div style="padding:12px;color:#999;font-style:italic;">No data.</div>' : `
                         <table style="width:100%;border-collapse:collapse;background:#f8f9ff;">
                             <thead><tr style="background:#eef0ff;font-size:12px;color:#667eea;">
@@ -4086,7 +4122,7 @@ function renderCampaignTargetingTab() {
                                 <th style="padding:6px 8px;text-align:right;">Impressions</th><th style="padding:6px 8px;text-align:right;">Clicks</th>
                                 <th style="padding:6px 8px;text-align:right;">CTR</th><th style="padding:6px 8px;text-align:right;">Spend</th>
                                 <th style="padding:6px 8px;text-align:right;">Sales</th><th style="padding:6px 8px;text-align:right;">Purchases</th>
-                                <th style="padding:6px 8px;text-align:right;">ROAS</th>
+                                <th style="padding:6px 8px;text-align:right;">ROAS</th><th style="padding:6px 8px;text-align:right;">CPC</th>
                             </tr></thead>
                             <tbody>${top10.map(t=>`
                                 <tr style="font-size:12px;border-top:1px solid #e8eaf6;">
@@ -4098,6 +4134,7 @@ function renderCampaignTargetingTab() {
                                     <td style="padding:5px 8px;text-align:right;color:#555;">$${t.sal.toLocaleString('en-US',{maximumFractionDigits:2})}</td>
                                     <td style="padding:5px 8px;text-align:right;color:#555;">${t.pur.toLocaleString()}</td>
                                     <td style="padding:5px 8px;text-align:right;color:#555;">${t.roas.toFixed(2)}x</td>
+                                    <td style="padding:5px 8px;text-align:right;color:#555;">$${(t.clk>0?t.sp/t.clk:0).toFixed(2)}</td>
                                 </tr>`).join('')}
                             </tbody>
                         </table>`;
