@@ -2614,6 +2614,8 @@ function renderCampaignTargetingTab() {
                                         label += value.toFixed(2) + '%';
                                     } else if (context.dataset.label === 'ROAS') {
                                         label += value.toFixed(2) + 'x';
+                                    } else if (['CAC', 'CPC'].includes(context.dataset.label)) {
+                                        label += '$' + value.toFixed(2);
                                     } else {
                                         label += value.toLocaleString('en-US', {maximumFractionDigits: 0});
                                     }
