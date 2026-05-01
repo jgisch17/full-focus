@@ -850,6 +850,12 @@
                     <option value="impressions">Impressions</option>
                     <option value="ctr">CTR</option>
                 </select>
+                <label style="margin-left: 15px;">Keyword Type:</label>
+                <select id="termBrandFilter" onchange="stPage=1;renderSearchTermTable()" style="padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
+                    <option value="all">All Keywords</option>
+                    <option value="branded">Branded Only</option>
+                    <option value="nonbranded">Non-Branded Only</option>
+                </select>
             </div>
 
             <!-- KPI Tiles -->
@@ -3848,6 +3854,18 @@ function renderCampaignTargetingTab() {
             let data = filtered.terms;
             if (!groups.includes('all')) {
                 data = data.filter(d => groups.includes(d['Product Group']));
+            }
+
+            const brandFilter = document.getElementById('termBrandFilter') ? document.getElementById('termBrandFilter').value : 'all';
+            const brandedTerms = ['full focus', 'michael hyatt'];
+            function isBranded(term) {
+                const t = (term || '').toLowerCase();
+                return brandedTerms.some(b => t.includes(b));
+            }
+            if (brandFilter === 'branded') {
+                data = data.filter(d => isBranded(d['Search term']));
+            } else if (brandFilter === 'nonbranded') {
+                data = data.filter(d => !isBranded(d['Search term']));
             }
 
             // ---- Step 1: Always aggregate to unique keywords (for KPI + charts) ----
