@@ -68,7 +68,7 @@ The script classifies campaigns into these strategies automatically from the cam
 |-----|-------------|
 | `campaign_data` | Per-campaign monthly rows |
 | `sku_data` | Per-SKU monthly rows |
-| `search_term_data` | Top 100 terms by lifetime spend, monthly |
+| `search_term_data` | Top 50 terms by lifetime spend, monthly |
 | `asin_performance` | Monthly per-SKU with CAC |
 | `time_series` | Monthly ad totals (ROAS, CAC, CTR) |
 | `daily_series` / `weekly_series` | Daily/weekly ad totals |
@@ -123,5 +123,5 @@ HTTP 200 = updated, 201 = created. The same token is shared with the Stargazer p
 
 - `dashboard-data.js` is generated — always rebuild via `build_dashboard_data.py`, never edit manually
 - `Shipped COGS` and `Shipped Revenue` in `time_series` are currently `0` — populate from business data when available
-- The search term table is capped at the top 100 terms by lifetime spend to keep file size manageable
+- The search term table is capped at the top 50 terms by lifetime spend to keep file size manageable
 - No web server needed; `index.html` loads `dashboard-data.js` from the same directory
