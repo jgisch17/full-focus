@@ -259,13 +259,13 @@ sku_data = sorted([
     for (mp, sku, pname, pgroup), d in sku_monthly.items()
 ], key=lambda x: (x["Month_Period"], x["Advertised product SKU"]))
 
-# search_term_data — top 100 terms by lifetime spend, then monthly rows for those terms only
+# search_term_data — top 50 terms by lifetime spend, then monthly rows for those terms only
 term_lifetime = {}
 for (mp, term, sku, pgroup), d in term_monthly.items():
     if term not in term_lifetime:
         term_lifetime[term] = 0
     term_lifetime[term] += d["Total cost"]
-top_500_terms = set(sorted(term_lifetime, key=lambda t: -term_lifetime[t])[:100])
+top_500_terms = set(sorted(term_lifetime, key=lambda t: -term_lifetime[t])[:50])
 
 search_term_data = sorted([
     {"Month_Period": mp, "Search term": term, "Advertised product SKU": sku,
