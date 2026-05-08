@@ -1052,10 +1052,36 @@
 
         <!-- BSR Tracking Tab -->
         <div id="bsr-tracking" class="tab-content">
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:400px; gap:16px; color:#999;">
-                <div style="font-size:48px;">🚧</div>
-                <div style="font-size:22px; font-weight:600; color:#555;">Under Construction</div>
-                <div style="font-size:14px;">BSR Tracking coming soon.</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <div>
+                    <h2 style="margin:0; font-size:20px; color:#333;">BSR Tracking — Personal Organizers</h2>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">Amazon Best Sellers Rank — updated daily at 6:30am PT</div>
+                </div>
+                <div id="bsrDaysLabel" style="font-size:13px; color:#888;"></div>
+            </div>
+
+            <!-- KPI row -->
+            <div id="bsrKpiRow" style="display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap;"></div>
+
+            <!-- Rank history chart -->
+            <div class="chart-card" style="margin-bottom:20px;">
+                <div class="chart-title">Rank History (lower = better)</div>
+                <div style="position:relative; height:320px;">
+                    <canvas id="bsrRankChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Rankings table -->
+            <div class="chart-card">
+                <div class="chart-title">All Tracked Products</div>
+                <div id="bsrTable"></div>
+            </div>
+
+            <!-- Empty state -->
+            <div id="bsrEmpty" style="display:none; text-align:center; padding:60px 0; color:#999;">
+                <div style="font-size:40px; margin-bottom:12px;">📊</div>
+                <div style="font-size:18px; font-weight:600; color:#555; margin-bottom:8px;">No BSR data yet</div>
+                <div style="font-size:13px;">Run <code>bash run_bsr_ff.sh</code> to collect the first day's ranks.</div>
             </div>
         </div>
 
@@ -4543,11 +4569,160 @@ function renderCampaignTargetingTab() {
         }
 
         function renderBSRTab() {
-            return;
+            const bsr = (dashboardData.bsr_data) || {dates:[], rankings:[]};
+            const dates = bsr.dates || [];
+            const rankings = bsr.rankings || [];
+
+            const empty = document.getElementById('bsrEmpty');
+            const kpiRow = document.getElementById('bsrKpiRow');
+            const tableEl = document.getElementById('bsrTable');
+            const daysLabel = document.getElementById('bsrDaysLabel');
+
+            if (dates.length === 0) {
+                empty.style.display = 'block';
+                kpiRow.style.display = 'none';
+                document.querySelector('#bsr-tracking .chart-card') && (document.querySelectorAll('#bsr-tracking .chart-card').forEach(el => el.style.display = 'none'));
+                return;
+            }
+            empty.style.display = 'none';
+            kpiRow.style.display = 'flex';
+            document.querySelectorAll('#bsr-tracking .chart-card').forEach(el => el.style.display = '');
+
+            daysLabel.textContent = dates.length + ' days tracked · Last: ' + dates[dates.length - 1];
+
+            // Only show products that have appeared at least once
+            const active = rankings.filter(p => p.best !== null);
+            const lastIdx = dates.length - 1;
+
+            // ── KPI cards ─────────────────────────────────────────────────────
+            kpiRow.innerHTML = '';
+            const today = active.filter(p => p.latest !== null).sort((a,b) => a.latest - b.latest);
+            if (today.length > 0) {
+                today.slice(0, 5).forEach(p => {
+                    const prevRank = p.ranks.length >= 2 ? p.ranks[p.ranks.length - 2] : null;
+                    const delta = (prevRank && p.latest) ? prevRank - p.latest : null;
+                    const deltaHtml = delta === null ? '' :
+                        delta > 0 ? `<div style="font-size:12px;color:#22c55e;margin-top:4px;">+${delta} vs yesterday</div>` :
+                        delta < 0 ? `<div style="font-size:12px;color:#ef4444;margin-top:4px;">${delta} vs yesterday</div>` :
+                        `<div style="font-size:12px;color:#888;margin-top:4px;">No change</div>`;
+                    kpiRow.innerHTML += `
+                        <div class="metric-card" style="min-width:160px;flex:1;">
+                            <div class="metric-label" style="font-size:11px;">${p.product}</div>
+                            <div class="metric-value" style="font-size:28px;">#${p.latest}</div>
+                            <div style="font-size:11px;color:#888;">Best: #${p.best}</div>
+                            ${deltaHtml}
+                        </div>`;
+                });
+            } else {
+                kpiRow.innerHTML = '<div style="color:#888;font-size:13px;padding:16px;">No products ranked today.</div>';
+            }
+
+            // ── Rank history chart ────────────────────────────────────────────
+            const colors = [
+                '#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6',
+                '#ec4899','#14b8a6','#f97316','#8b5cf6','#06b6d4',
+            ];
+            const displayDates = dates.length > 60 ? dates.slice(-60) : dates;
+            const sliceFrom = dates.length - displayDates.length;
+
+            const datasets = active.map((p, i) => ({
+                label: p.product,
+                data: p.ranks.slice(sliceFrom).map(r => r === null ? null : r),
+                borderColor: colors[i % colors.length],
+                backgroundColor: colors[i % colors.length] + '20',
+                borderWidth: 2,
+                pointRadius: displayDates.length <= 30 ? 4 : 2,
+                pointHoverRadius: 6,
+                tension: 0.3,
+                spanGaps: true,
+            }));
+
+            const ctxBSR = document.getElementById('bsrRankChart');
+            if (charts.bsrRankChart) charts.bsrRankChart.destroy();
+            charts.bsrRankChart = new Chart(ctxBSR, {
+                type: 'line',
+                data: { labels: displayDates, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.parsed.y === null ? ctx.dataset.label + ': —' :
+                                              ctx.dataset.label + ': #' + ctx.parsed.y,
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+                        y: {
+                            reverse: true,
+                            title: { display: true, text: 'BSR Rank (lower = better)' },
+                            ticks: {
+                                stepSize: 1,
+                                callback: v => '#' + v,
+                            }
+                        }
+                    }
+                }
+            });
+
+            // ── Rankings table ────────────────────────────────────────────────
+            const allRanked = [...active].sort((a,b) => {
+                if (a.latest && b.latest) return a.latest - b.latest;
+                if (a.latest) return -1;
+                if (b.latest) return 1;
+                return (a.best||999) - (b.best||999);
+            });
+
+            let thtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;color:#555;">Product</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">Today</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">Yesterday</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">Best Ever</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">Days Ranked</th>
+                    </tr>
+                </thead><tbody>`;
+
+            allRanked.forEach((p, i) => {
+                const todayRank = p.latest;
+                const yestRank  = p.ranks.length >= 2 ? p.ranks[p.ranks.length - 2] : null;
+                const daysRanked = p.ranks.filter(r => r !== null).length;
+                const delta = (todayRank && yestRank) ? yestRank - todayRank : null;
+                const deltaStr = delta === null ? '' :
+                    delta > 0 ? `<span style="color:#22c55e;font-size:11px;"> ↑${delta}</span>` :
+                    delta < 0 ? `<span style="color:#ef4444;font-size:11px;"> ↓${Math.abs(delta)}</span>` :
+                    `<span style="color:#888;font-size:11px;"> →</span>`;
+                const dotColor = colors[allRanked.indexOf(p) % colors.length];
+                thtml += `<tr style="border-bottom:1px solid #f1f5f9;${i%2===1?'background:#fafafa;':''}">
+                    <td style="padding:10px 12px;">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};margin-right:8px;"></span>
+                        ${p.product}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;font-weight:600;">
+                        ${todayRank ? '#' + todayRank + deltaStr : '—'}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;color:#666;">
+                        ${yestRank ? '#' + yestRank : '—'}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;color:#6366f1;font-weight:600;">
+                        ${p.best ? '#' + p.best : '—'}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;color:#888;">
+                        ${daysRanked}
+                    </td>
+                </tr>`;
+            });
+            thtml += '</tbody></table>';
+            tableEl.innerHTML = thtml;
         }
 
         function renderBSROverlayChart() {
-            return;
+            // placeholder — no ad-spend overlay for Full Focus BSR
         }
 
         function renderStCharts(termAggArr) {
