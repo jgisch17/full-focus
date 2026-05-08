@@ -1087,10 +1087,42 @@
 
         <!-- SOV Tracking Tab -->
         <div id="sov-tracking" class="tab-content">
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:400px; gap:16px; color:#999;">
-                <div style="font-size:48px;">🚧</div>
-                <div style="font-size:22px; font-weight:600; color:#555;">Under Construction</div>
-                <div style="font-size:14px;">SOV Tracking coming soon.</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <div>
+                    <h2 style="margin:0; font-size:20px; color:#333;">Share of Voice — "daily planner"</h2>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">Amazon page 1 organic + paid placements · updated daily at 6:35am PT</div>
+                </div>
+                <div id="sovDaysLabel" style="font-size:13px; color:#888;"></div>
+            </div>
+
+            <!-- KPI row -->
+            <div id="sovKpiRow" style="display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap;"></div>
+
+            <!-- Trend chart -->
+            <div class="chart-card" style="margin-bottom:20px;">
+                <div class="chart-title">SOV Trend Over Time</div>
+                <div style="position:relative; height:280px;">
+                    <canvas id="sovTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Today's page 1 grid + found products side by side -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+                <div class="chart-card">
+                    <div class="chart-title">Today's Page 1 Position Map</div>
+                    <div id="sovPositionMap" style="font-size:12px;"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Full Focus Products Found Today</div>
+                    <div id="sovProductsFound"></div>
+                </div>
+            </div>
+
+            <!-- Empty state -->
+            <div id="sovEmpty" style="display:none; text-align:center; padding:60px 0; color:#999;">
+                <div style="font-size:40px; margin-bottom:12px;">👁️</div>
+                <div style="font-size:18px; font-weight:600; color:#555; margin-bottom:8px;">No SOV data yet</div>
+                <div style="font-size:13px;">Run <code>bash run_sov_ff.sh</code> to collect the first day's data.</div>
             </div>
         </div>
 
@@ -1487,7 +1519,224 @@
 
 
         function renderSOVTab() {
-            return;
+            const sovData = (dashboardData.sov_data) || {dates:[], keywords:[]};
+            const dates   = sovData.dates || [];
+            const kw      = (sovData.keywords || []).find(k => k.keyword === 'daily planner');
+
+            const empty      = document.getElementById('sovEmpty');
+            const kpiRow     = document.getElementById('sovKpiRow');
+            const daysLabel  = document.getElementById('sovDaysLabel');
+
+            function showEmpty() {
+                empty.style.display = 'block';
+                kpiRow.style.display = 'none';
+                document.querySelectorAll('#sov-tracking .chart-card').forEach(el => el.style.display = 'none');
+                document.getElementById('sovPositionMap').closest('.chart-card') && null;
+            }
+
+            if (!dates.length || !kw) { showEmpty(); return; }
+            empty.style.display = 'none';
+            kpiRow.style.display = 'flex';
+            document.querySelectorAll('#sov-tracking .chart-card').forEach(el => el.style.display = '');
+
+            daysLabel.textContent = dates.length + ' days tracked · Last: ' + dates[dates.length - 1];
+
+            const lastIdx    = dates.length - 1;
+            const orgSOV     = kw.organic_sov[lastIdx];
+            const paidSOV    = kw.paid_sov[lastIdx];
+            const totSOV     = kw.total_sov[lastIdx];
+            const orgPos     = kw.organic_positions[lastIdx] || [];
+            const paidPos    = kw.paid_positions[lastIdx] || [];
+            const orgAsins   = kw.organic_asins[lastIdx] || [];
+            const paidAsins  = kw.paid_asins[lastIdx] || [];
+            const orgTotal   = kw.organic_total[lastIdx] || 0;
+            const paidTotal  = kw.paid_total[lastIdx] || 0;
+
+            const prevOrgSOV  = lastIdx > 0 ? kw.organic_sov[lastIdx-1]  : null;
+            const prevPaidSOV = lastIdx > 0 ? kw.paid_sov[lastIdx-1]     : null;
+            const prevTotSOV  = lastIdx > 0 ? kw.total_sov[lastIdx-1]    : null;
+
+            function fmtSov(v) { return v !== null && v !== undefined ? v.toFixed(1) + '%' : '—'; }
+            function deltaHtml(cur, prev) {
+                if (cur === null || prev === null || prev === undefined) return '';
+                const d = (cur - prev).toFixed(1);
+                if (d > 0)  return `<div style="font-size:11px;color:#22c55e;margin-top:4px;">+${d}pp vs yesterday</div>`;
+                if (d < 0)  return `<div style="font-size:11px;color:#ef4444;margin-top:4px;">${d}pp vs yesterday</div>`;
+                return `<div style="font-size:11px;color:#888;margin-top:4px;">No change</div>`;
+            }
+
+            // ── KPI cards ─────────────────────────────────────────────────────
+            kpiRow.innerHTML = `
+                <div class="metric-card" style="min-width:160px;flex:1;">
+                    <div class="metric-label">Organic SOV</div>
+                    <div class="metric-value" style="font-size:28px;">${fmtSov(orgSOV)}</div>
+                    <div style="font-size:11px;color:#888;">${orgPos.length} slot${orgPos.length!==1?'s':''} of ${orgTotal} organic</div>
+                    ${deltaHtml(orgSOV, prevOrgSOV)}
+                </div>
+                <div class="metric-card" style="min-width:160px;flex:1;">
+                    <div class="metric-label">Paid SOV</div>
+                    <div class="metric-value" style="font-size:28px;">${fmtSov(paidSOV)}</div>
+                    <div style="font-size:11px;color:#888;">${paidPos.length} slot${paidPos.length!==1?'s':''} of ${paidTotal} paid</div>
+                    ${deltaHtml(paidSOV, prevPaidSOV)}
+                </div>
+                <div class="metric-card" style="min-width:160px;flex:1;">
+                    <div class="metric-label">Combined SOV</div>
+                    <div class="metric-value" style="font-size:28px;">${fmtSov(totSOV)}</div>
+                    <div style="font-size:11px;color:#888;">${orgPos.length + paidPos.length} total FF slots</div>
+                    ${deltaHtml(totSOV, prevTotSOV)}
+                </div>
+                <div class="metric-card" style="min-width:160px;flex:1;">
+                    <div class="metric-label">Best Organic Position</div>
+                    <div class="metric-value" style="font-size:28px;">${orgPos.length ? '#'+Math.min(...orgPos) : '—'}</div>
+                    <div style="font-size:11px;color:#888;">today's page 1</div>
+                </div>`;
+
+            // ── Trend chart ───────────────────────────────────────────────────
+            const displayDates = dates.length > 60 ? dates.slice(-60) : dates;
+            const sliceFrom    = dates.length - displayDates.length;
+
+            const ctxSOV = document.getElementById('sovTrendChart');
+            if (charts.sovTrendChart) charts.sovTrendChart.destroy();
+            charts.sovTrendChart = new Chart(ctxSOV, {
+                type: 'line',
+                data: {
+                    labels: displayDates,
+                    datasets: [
+                        {
+                            label: 'Combined SOV',
+                            data: kw.total_sov.slice(sliceFrom),
+                            borderColor: '#6366f1',
+                            backgroundColor: '#6366f120',
+                            borderWidth: 2.5,
+                            pointRadius: displayDates.length <= 30 ? 4 : 2,
+                            tension: 0.3,
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'Organic SOV',
+                            data: kw.organic_sov.slice(sliceFrom),
+                            borderColor: '#22c55e',
+                            backgroundColor: '#22c55e20',
+                            borderWidth: 2,
+                            pointRadius: displayDates.length <= 30 ? 3 : 1,
+                            tension: 0.3,
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'Paid SOV',
+                            data: kw.paid_sov.slice(sliceFrom),
+                            borderColor: '#f59e0b',
+                            backgroundColor: '#f59e0b20',
+                            borderWidth: 2,
+                            borderDash: [4, 3],
+                            pointRadius: displayDates.length <= 30 ? 3 : 1,
+                            tension: 0.3,
+                            spanGaps: true,
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.dataset.label + ': ' +
+                                    (ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + '%' : '—')
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+                        y: {
+                            min: 0,
+                            title: { display: true, text: 'Share of Voice (%)' },
+                            ticks: { callback: v => v + '%' }
+                        }
+                    }
+                }
+            });
+
+            // ── Position map ──────────────────────────────────────────────────
+            const mapEl = document.getElementById('sovPositionMap');
+            const totalSlots = orgTotal + paidTotal;
+            const orgSet  = new Set(orgPos);
+            const paidSet = new Set(paidPos);
+            // Build organic grid (positions 1..orgTotal)
+            let mapHtml = '<div style="margin-bottom:10px;">';
+            mapHtml += '<div style="font-size:11px;color:#888;margin-bottom:6px;">Organic results (' + orgTotal + ' slots)</div>';
+            mapHtml += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+            for (let i = 1; i <= Math.max(orgTotal, 48); i++) {
+                if (i > orgTotal) break;
+                const isFF = orgSet.has(i);
+                mapHtml += `<div title="Position ${i}" style="width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:${isFF?700:400};
+                    background:${isFF?'#22c55e':'#f1f5f9'};color:${isFF?'#fff':'#94a3b8'};">${i}</div>`;
+            }
+            mapHtml += '</div></div>';
+            // Paid grid
+            if (paidTotal > 0) {
+                mapHtml += '<div>';
+                mapHtml += '<div style="font-size:11px;color:#888;margin-bottom:6px;">Paid / sponsored results (' + paidTotal + ' slots)</div>';
+                mapHtml += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+                for (let i = 1; i <= paidTotal; i++) {
+                    const isFF = paidSet.has(i);
+                    mapHtml += `<div title="Paid position ${i}" style="width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:${isFF?700:400};
+                        background:${isFF?'#f59e0b':'#f1f5f9'};color:${isFF?'#fff':'#94a3b8'};">${i}</div>`;
+                }
+                mapHtml += '</div></div>';
+            }
+            mapHtml += '<div style="display:flex;gap:12px;margin-top:10px;font-size:11px;color:#666;">';
+            mapHtml += '<span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#22c55e;margin-right:4px;vertical-align:middle;"></span>Full Focus organic</span>';
+            mapHtml += '<span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#f59e0b;margin-right:4px;vertical-align:middle;"></span>Full Focus paid</span>';
+            mapHtml += '<span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#f1f5f9;margin-right:4px;vertical-align:middle;"></span>Competitor</span>';
+            mapHtml += '</div>';
+            mapEl.innerHTML = mapHtml;
+
+            // ── Products found ────────────────────────────────────────────────
+            const prodEl = document.getElementById('sovProductsFound');
+            const ASIN_NAMES = {
+                "1732189692":"Grey Linen Planner","173218965X":"Navy Linen Planner",
+                "1732189668":"Oatmeal Linen Planner","1732189641":"Black Leather Planner",
+                "1737211939":"Black Leather Planner (Stone)","1732189684":"French Blue Leather Planner",
+                "173397010X":"Black Leather Planner (Eggplant)","1732189633":"No Fail Meetings Book",
+                "1735381705":"Entrepreneurs Book","1735381713":"No Fail Habits",
+                "1732189617":"2023 Journal","1737211912":"Sienna Linen Planner",
+                "1737211920":"Sea Blue Linen Planner","B0DVHT5Q4M":"Finch Linen Planner",
+                "B0DVJ14KSJ":"Latte Linen Planner","B0DVJ2FH7S":"Evergreen Linen Planner",
+                "1735381748":"Grey Leather Coil Planner","1735381764":"Oatmeal Leather Coil Planner",
+                "1737211955":"Navy Leather Coil Planner","1735381756":"Gray Leather Coil Planner",
+                "173538173X":"Gray Leather Coil Planner (Poppy)","B0DVHW8WRD":"Finch Linen Coil Planner",
+                "B0DVDNGXCN":"Sienna Linen Coil Planner","B0DVLYGP8V":"Finch Linen Coil Planner",
+                "B0DVLZGBMJ":"Latte Linen Coil Planner","B0DVLXFGL5":"Sea Blue Linen Coil Planner",
+                "B0DVLQ2LP1":"Black Vegan Leather Planner","B0DVQCG7KH":"Blush Vegan Leather Planner",
+                "B0DVL95K5P":"French Blue Vegan Planner","B0DVQCR46Q":"Saddle Vegan Leather Planner",
+                "1734836458":"Gray Leather Coil Planner","1734836466":"Gray Leather Coil Planner",
+            };
+            let prodHtml = '';
+            if (!orgAsins.length && !paidAsins.length) {
+                prodHtml = '<div style="color:#999;font-size:13px;padding:20px 0;">No Full Focus products found on page 1 today.</div>';
+            } else {
+                prodHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+                prodHtml += '<tr style="background:#f8f9fa;"><th style="padding:8px;text-align:left;color:#555;border-bottom:1px solid #e2e8f0;">Product</th><th style="padding:8px;text-align:center;color:#555;border-bottom:1px solid #e2e8f0;">Position</th><th style="padding:8px;text-align:center;color:#555;border-bottom:1px solid #e2e8f0;">Type</th></tr>';
+                orgAsins.forEach((asin, i) => {
+                    prodHtml += `<tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:8px;">${ASIN_NAMES[asin] || asin}</td>
+                        <td style="padding:8px;text-align:center;font-weight:600;">#${orgPos[i]||'?'}</td>
+                        <td style="padding:8px;text-align:center;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-size:11px;">Organic</span></td>
+                    </tr>`;
+                });
+                paidAsins.forEach((asin, i) => {
+                    prodHtml += `<tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:8px;">${ASIN_NAMES[asin] || asin}</td>
+                        <td style="padding:8px;text-align:center;font-weight:600;">#${paidPos[i]||'?'}</td>
+                        <td style="padding:8px;text-align:center;"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;">Paid</span></td>
+                    </tr>`;
+                });
+                prodHtml += '</table>';
+            }
+            prodEl.innerHTML = prodHtml;
         }
 
         function activateTab(tabId) {
@@ -1501,6 +1750,7 @@
             if (tabId === 'annual-plan') { renderAnnualPlanTable(); renderAnnualPlanCharts(); }
             if (tabId === 'dow-analysis') renderDowTab();
             if (tabId === 'bsr-tracking') renderBSRTab();
+            if (tabId === 'sov-tracking') renderSOVTab();
             if (tabId === 'sov-tracking') renderSOVTab();
             if (tabId === 'insights') renderInsightsTab();
         }
