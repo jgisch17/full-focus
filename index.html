@@ -1128,10 +1128,36 @@
 
         <!-- Price Tracking Tab -->
         <div id="price-tracking" class="tab-content">
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:400px; gap:16px; color:#999;">
-                <div style="font-size:48px;">🚧</div>
-                <div style="font-size:22px; font-weight:600; color:#555;">Under Construction</div>
-                <div style="font-size:14px;">Price Tracking coming soon.</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                <div>
+                    <h2 style="margin:0; font-size:20px; color:#333;">Price Tracking — Listing Prices</h2>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">Amazon current listing price · updated daily at 6:25am PT</div>
+                </div>
+                <div id="priceDaysLabel" style="font-size:13px; color:#888;"></div>
+            </div>
+
+            <!-- KPI row -->
+            <div id="priceKpiRow" style="display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap;"></div>
+
+            <!-- Price history chart -->
+            <div class="chart-card" style="margin-bottom:20px;">
+                <div class="chart-title">Price History</div>
+                <div style="position:relative; height:320px;">
+                    <canvas id="priceHistoryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Price table -->
+            <div class="chart-card">
+                <div class="chart-title">All Tracked Products</div>
+                <div id="priceTable"></div>
+            </div>
+
+            <!-- Empty state -->
+            <div id="priceEmpty" style="display:none; text-align:center; padding:60px 0; color:#999;">
+                <div style="font-size:40px; margin-bottom:12px;">🏷️</div>
+                <div style="font-size:18px; font-weight:600; color:#555; margin-bottom:8px;">No price data yet</div>
+                <div style="font-size:13px;">Run <code>bash run_price_ff.sh</code> to collect the first day's prices.</div>
             </div>
         </div>
 
@@ -1751,7 +1777,7 @@
             if (tabId === 'dow-analysis') renderDowTab();
             if (tabId === 'bsr-tracking') renderBSRTab();
             if (tabId === 'sov-tracking') renderSOVTab();
-            if (tabId === 'sov-tracking') renderSOVTab();
+            if (tabId === 'price-tracking') renderPriceTab();
             if (tabId === 'insights') renderInsightsTab();
         }
 
@@ -4973,6 +4999,146 @@ function renderCampaignTargetingTab() {
 
         function renderBSROverlayChart() {
             // placeholder — no ad-spend overlay for Full Focus BSR
+        }
+
+        function renderPriceTab() {
+            const pd = (dashboardData.price_data) || {dates:[], products:[]};
+            const dates = pd.dates || [];
+            const products = pd.products || [];
+
+            const empty = document.getElementById('priceEmpty');
+            const kpiRow = document.getElementById('priceKpiRow');
+            const tableEl = document.getElementById('priceTable');
+            const daysLabel = document.getElementById('priceDaysLabel');
+
+            if (dates.length === 0) {
+                empty.style.display = 'block';
+                kpiRow.style.display = 'none';
+                document.querySelectorAll('#price-tracking .chart-card').forEach(el => el.style.display = 'none');
+                return;
+            }
+            empty.style.display = 'none';
+            kpiRow.style.display = 'flex';
+            document.querySelectorAll('#price-tracking .chart-card').forEach(el => el.style.display = '');
+
+            daysLabel.textContent = dates.length + ' days tracked · Last: ' + dates[dates.length - 1];
+
+            const colors = [
+                '#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6',
+                '#ec4899','#14b8a6','#f97316','#8b5cf6','#06b6d4',
+            ];
+
+            // ── KPI cards ─────────────────────────────────────────────────────
+            kpiRow.innerHTML = '';
+            products.forEach((p, i) => {
+                if (p.latest === null && p.low === null) return;
+                const prev = p.prices.length >= 2 ? p.prices[p.prices.length - 2] : null;
+                const delta = (prev !== null && p.latest !== null) ? p.latest - prev : null;
+                const deltaHtml = delta === null ? '' :
+                    delta < 0 ? `<div style="font-size:12px;color:#22c55e;margin-top:4px;">${delta > 0 ? '+' : ''}$${delta.toFixed(2)} vs yesterday</div>` :
+                    delta > 0 ? `<div style="font-size:12px;color:#ef4444;margin-top:4px;">+$${delta.toFixed(2)} vs yesterday</div>` :
+                    `<div style="font-size:12px;color:#888;margin-top:4px;">No change</div>`;
+                const priceStr = p.latest !== null ? '$' + p.latest.toFixed(2) : '—';
+                kpiRow.innerHTML += `
+                    <div class="metric-card" style="min-width:160px;flex:1;">
+                        <div class="metric-label" style="font-size:11px;">${p.product}</div>
+                        <div class="metric-value" style="font-size:28px;">${priceStr}</div>
+                        <div style="font-size:11px;color:#888;">Low: ${p.low !== null ? '$'+p.low.toFixed(2) : '—'} · High: ${p.high !== null ? '$'+p.high.toFixed(2) : '—'}</div>
+                        ${deltaHtml}
+                    </div>`;
+            });
+
+            // ── Price history chart ───────────────────────────────────────────
+            const displayDates = dates.length > 60 ? dates.slice(-60) : dates;
+            const sliceFrom = dates.length - displayDates.length;
+
+            const datasets = products.map((p, i) => ({
+                label: p.product,
+                data: p.prices.slice(sliceFrom).map(v => v === null ? null : v),
+                borderColor: colors[i % colors.length],
+                backgroundColor: colors[i % colors.length] + '20',
+                borderWidth: 2,
+                pointRadius: displayDates.length <= 30 ? 4 : 2,
+                pointHoverRadius: 6,
+                tension: 0.3,
+                spanGaps: true,
+            }));
+
+            const ctxPrice = document.getElementById('priceHistoryChart');
+            if (charts.priceHistoryChart) charts.priceHistoryChart.destroy();
+            charts.priceHistoryChart = new Chart(ctxPrice, {
+                type: 'line',
+                data: { labels: displayDates, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.parsed.y === null ? ctx.dataset.label + ': —' :
+                                              ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2),
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+                        y: {
+                            title: { display: true, text: 'Price (USD)' },
+                            ticks: { callback: v => '$' + v.toFixed(2) }
+                        }
+                    }
+                }
+            });
+
+            // ── Price table ───────────────────────────────────────────────────
+            let thtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;color:#555;">Product</th>
+                        <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;color:#555;">ASIN</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">Today</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">Yesterday</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">All-Time Low</th>
+                        <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e2e8f0;color:#555;">All-Time High</th>
+                    </tr>
+                </thead><tbody>`;
+
+            products.forEach((p, i) => {
+                const todayPrice = p.latest;
+                const yestPrice  = p.prices.length >= 2 ? p.prices[p.prices.length - 2] : null;
+                const delta = (todayPrice !== null && yestPrice !== null) ? todayPrice - yestPrice : null;
+                const deltaStr = delta === null ? '' :
+                    delta < 0 ? `<span style="color:#22c55e;font-size:11px;"> ↓$${Math.abs(delta).toFixed(2)}</span>` :
+                    delta > 0 ? `<span style="color:#ef4444;font-size:11px;"> ↑$${delta.toFixed(2)}</span>` :
+                    `<span style="color:#888;font-size:11px;"> →</span>`;
+                const dotColor = colors[i % colors.length];
+                const asinUrl = `https://www.amazon.com/dp/${p.asin}`;
+                thtml += `<tr style="border-bottom:1px solid #f1f5f9;${i%2===1?'background:#fafafa;':''}">
+                    <td style="padding:10px 12px;">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};margin-right:8px;"></span>
+                        ${p.product}
+                    </td>
+                    <td style="padding:10px 12px;">
+                        <a href="${asinUrl}" target="_blank" style="color:#6366f1;text-decoration:none;font-family:monospace;">${p.asin}</a>
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;font-weight:600;">
+                        ${todayPrice !== null ? '$' + todayPrice.toFixed(2) + deltaStr : '—'}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;color:#666;">
+                        ${yestPrice !== null ? '$' + yestPrice.toFixed(2) : '—'}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;color:#22c55e;font-weight:600;">
+                        ${p.low !== null ? '$' + p.low.toFixed(2) : '—'}
+                    </td>
+                    <td style="padding:10px 12px;text-align:center;color:#ef4444;font-weight:600;">
+                        ${p.high !== null ? '$' + p.high.toFixed(2) : '—'}
+                    </td>
+                </tr>`;
+            });
+            thtml += '</tbody></table>';
+            tableEl.innerHTML = thtml;
         }
 
         function renderStCharts(termAggArr) {
