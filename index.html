@@ -1871,19 +1871,36 @@
         }
 
         function getPreviousPeriod(startDate, endDate) {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            const start = new Date(startDate + 'T00:00:00');
+            const end   = new Date(endDate   + 'T00:00:00');
 
+            // If the current period is a complete calendar month, snap to the
+            // previous complete calendar month. This prevents the rolling-window
+            // from spanning two months and double-counting monthly data rows.
+            const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+            const isFullMonth = start.getDate() === 1 &&
+                                end.getDate()   === lastDayOfMonth &&
+                                start.getFullYear() === end.getFullYear() &&
+                                start.getMonth()    === end.getMonth();
+
+            if (isFullMonth) {
+                const prevMonthStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+                const prevMonthEnd   = new Date(start.getFullYear(), start.getMonth(),     0);
+                return {
+                    start: prevMonthStart.toISOString().split('T')[0],
+                    end:   prevMonthEnd.toISOString().split('T')[0]
+                };
+            }
+
+            // Default: rolling window of the same length
+            const daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
             const prevEnd = new Date(start);
             prevEnd.setDate(prevEnd.getDate() - 1);
-
             const prevStart = new Date(prevEnd);
             prevStart.setDate(prevStart.getDate() - daysDiff + 1);
-
             return {
                 start: prevStart.toISOString().split('T')[0],
-                end: prevEnd.toISOString().split('T')[0]
+                end:   prevEnd.toISOString().split('T')[0]
             };
         }
 
