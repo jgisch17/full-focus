@@ -166,3 +166,17 @@ HTTP 200 = updated, 201 = created. The same token is shared with the Stargazer p
 - `Shipped COGS` and `Shipped Revenue` in `time_series` are currently `0` — populate from business data when available
 - The search term table is capped at the top 50 terms by lifetime spend to keep file size manageable
 - No web server needed; `index.html` loads `dashboard-data.js` from the same directory
+
+## Superpowers & Skills
+
+Always use the Skill tool for the following before reporting work complete:
+
+| Situation | Skill to invoke |
+|-----------|----------------|
+| After any data ingest or dashboard update | `verify` — spin up `python3 -m http.server 8765` from the project dir, open `http://localhost:8765/index.html` in GStack Browser, enter the password, and confirm all key metrics match expected values before pushing to GitHub |
+| Bugs or unexpected data | `investigate` |
+| Reviewing code/script changes | `review` |
+| Pushing live | confirm via `verify` first |
+
+**Dashboard password:** ask the user — do not store in this file.
+**Key rule:** never push to GitHub and declare "done" without first running `verify` to confirm the live dashboard shows accurate data.
