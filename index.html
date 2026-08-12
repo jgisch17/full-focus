@@ -672,6 +672,7 @@
                             <option value="Shipped Revenue">Total Revenue</option>
                             <option value="tROAS">tROAS (x)</option>
                             <option value="ROAS">ROAS</option>
+                            <option value="NTB %">NTB (%)</option>
                             <option value="Purchases">Purchases</option>
                             <option value="Impressions">Impressions</option>
                             <option value="Clicks">Clicks</option>
@@ -686,6 +687,7 @@
                             <option value="Shipped Revenue">Total Revenue</option>
                             <option value="tROAS">tROAS (x)</option>
                             <option value="ROAS">ROAS</option>
+                            <option value="NTB %">NTB (%)</option>
                             <option value="Purchases">Purchases</option>
                             <option value="Impressions">Impressions</option>
                             <option value="Clicks">Clicks</option>
@@ -700,6 +702,7 @@
                             <option value="Shipped Revenue">Total Revenue</option>
                             <option value="tROAS">tROAS (x)</option>
                             <option value="ROAS" selected>ROAS</option>
+                            <option value="NTB %">NTB (%)</option>
                             <option value="Purchases">Purchases</option>
                             <option value="Impressions">Impressions</option>
                             <option value="Clicks">Clicks</option>
@@ -709,7 +712,7 @@
                     </div>
                 </div>
                 <canvas id="trendChart"></canvas>
-                <p id="trendNote" style="color: #999; font-size: 11px; margin-top: 8px; font-style: italic;">Note: tROAS is only available in Monthly view (requires monthly total sales data)</p>
+                <p id="trendNote" style="color: #999; font-size: 11px; margin-top: 8px; font-style: italic;">Note: tROAS, NTB % and Ordered Revenue are only available in Monthly view (require monthly data)</p>
             </div>
 
 
@@ -1377,7 +1380,7 @@
         <!-- Annual Plan Tab -->
         <div id="annual-plan" class="tab-content">
             <h2 style="margin-bottom:8px;">Annual Media Plan vs. Actuals</h2>
-            <p style="color:#666;font-size:13px;margin-bottom:20px;">Plan targets vs. actual performance. <span style="background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:4px;font-weight:600;">Green</span> = on/above goal &nbsp;|&nbsp; <span style="background:#ffebee;color:#c62828;padding:2px 7px;border-radius:4px;font-weight:600;">Red</span> = below goal &nbsp;|&nbsp; tROAS goal: 3.5x</p>
+            <p style="color:#666;font-size:13px;margin-bottom:20px;">Plan targets vs. actual performance. <span style="background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:4px;font-weight:600;">Green</span> = on/above goal &nbsp;|&nbsp; <span style="background:#ffebee;color:#c62828;padding:2px 7px;border-radius:4px;font-weight:600;">Red</span> = below goal &nbsp;|&nbsp; tROAS goal: 3.5x &nbsp;|&nbsp; NTB goal: 65%</p>
             <div class="chart-container">
                 <div style="overflow-x:auto;">
                     <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:1100px;">
@@ -1518,6 +1521,20 @@
 
     <script src="dashboard-data.js"></script>
     <script>
+        // Merge ntb_data (monthly % of sales new-to-brand) onto time_series rows so the
+        // trend chart and Annual Plan can read it like any other monthly metric.
+        (function mergeNTB() {
+            if (typeof dashboardData === 'undefined') return;
+            var ntb = dashboardData.ntb_data || [];
+            var byMonth = {};
+            for (var i = 0; i < ntb.length; i++) byMonth[ntb[i].Month_Period] = ntb[i].ntb_pct;
+            var ts = dashboardData.time_series || [];
+            for (var j = 0; j < ts.length; j++) {
+                var v = byMonth[ts[j].Month_Period];
+                if (v != null) ts[j]['NTB %'] = v;
+            }
+        })();
+
         var stPage = 1;
         let charts = {};
         let currentDimension = 'daily';
@@ -2755,6 +2772,7 @@ function renderCampaignTargetingTab() {
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             var ROAS_GOAL  = 2.5;
             var TROAS_GOAL = 3.5;
+            var NTB_GOAL   = 65;
 
             // Load actuals dynamically for any 2026 month present in time_series
             var actuals = {};
@@ -2901,6 +2919,30 @@ function renderCampaignTargetingTab() {
             }
             var totalTROAS = actTroasSpendTotal > 0 ? (actTroasRevTotal / actTroasSpendTotal) : null;
             out += (totalTROAS !== null ? actualCell(totalTROAS.toFixed(2) + 'x', totalTROAS >= TROAS_GOAL) : blankCell()) + '</tr>';
+
+            // ── NEW TO BRAND ──
+            out += sepRow('&#127381; New to Brand');
+
+            out += '<tr>';
+            out += '<td style="' + TDL + PLAN + '">NTB % Goal</td>';
+            for (var m=0; m<12; m++) out += planCell(NTB_GOAL.toFixed(0) + '%');
+            out += planCell(NTB_GOAL.toFixed(0) + '%') + '</tr>';
+
+            out += '<tr>';
+            out += '<td style="' + TDL + '">NTB % (Actual)</td>';
+            // TOTAL is weighted by ad sales, matching how Amazon aggregates % of sales new-to-brand.
+            var ntbWeighted = 0, ntbWeight = 0;
+            for (var m=0; m<12; m++) {
+                var a = actuals[m];
+                if (!a || a['NTB %'] == null) { out += blankCell(); continue; }
+                var ntb = +a['NTB %'];
+                var w = a.Sales || 0;
+                ntbWeighted += ntb * w;
+                ntbWeight   += w;
+                out += actualCell(ntb.toFixed(1) + '%', ntb >= NTB_GOAL);
+            }
+            var totalNTB = ntbWeight > 0 ? (ntbWeighted / ntbWeight) : null;
+            out += (totalNTB !== null ? actualCell(totalNTB.toFixed(1) + '%', totalNTB >= NTB_GOAL) : blankCell()) + '</tr>';
 
             const _apBody = document.getElementById('annualPlanBody'); if (_apBody) _apBody.innerHTML = out;
         }
@@ -3687,9 +3729,9 @@ function renderCampaignTargetingTab() {
             const note = document.getElementById('trendNote');
             if (note) {
                 if (dimension === 'monthly') {
-                    note.textContent = 'Note: tROAS and Ordered Revenue are only available in Monthly view.';
+                    note.textContent = 'Note: tROAS, NTB % and Ordered Revenue are only available in Monthly view.';
                 } else {
-                    note.textContent = 'Note: tROAS and Ordered Revenue are only available in Monthly view — switch to Monthly to plot these metrics.';
+                    note.textContent = 'Note: tROAS, NTB % and Ordered Revenue are only available in Monthly view — switch to Monthly to plot these metrics.';
                 }
             }
             renderTrendChart();
@@ -3726,16 +3768,25 @@ function renderCampaignTargetingTab() {
             var metric3 = document.getElementById('metric3Select').value;
 
             var colors = ['#182840', '#0e1b2e', '#f59e0b'];
-            var rightAxisMetrics = ['tROAS', 'ROAS', 'CTR', 'CAC'];
+            var rightAxisMetrics = ['tROAS', 'ROAS', 'CTR', 'CAC', 'NTB %'];
 
             var metricLabels = {
                 'Total cost':'Ad Spend', 'Sales':'Ad Sales', 'Shipped Revenue':'Total Revenue',
-                'tROAS':'tROAS (x)', 'ROAS':'ROAS', 'Purchases':'Purchases',
+                'tROAS':'tROAS (x)', 'ROAS':'ROAS', 'NTB %':'NTB (%)', 'Purchases':'Purchases',
                 'Impressions':'Impressions', 'Clicks':'Clicks', 'CTR':'CTR (%)', 'CAC':'CAC'
             };
 
             function getVal(d, m) {
-                if (currentDimension === 'monthly') return d[m] != null ? +d[m] : 0;
+                if (currentDimension === 'monthly') {
+                    // NTB % and tROAS aren't stored as plain columns — gap them out when absent
+                    // rather than plotting a misleading zero.
+                    if (m === 'NTB %') return d['NTB %'] != null ? +d['NTB %'] : null;
+                    if (m === 'tROAS') {
+                        var sp = +(d['Total cost'] || 0), rv = +(d['Shipped Revenue'] || 0);
+                        return (sp > 0 && rv > 0) ? rv / sp : null;
+                    }
+                    return d[m] != null ? +d[m] : 0;
+                }
                 if (m === 'Total cost')  return +(d.spend       || 0);
                 if (m === 'Sales')       return +(d.sales       || 0);
                 if (m === 'Purchases')   return +(d.purchases   || 0);
@@ -3790,8 +3841,8 @@ function renderCampaignTargetingTab() {
                                     var v = context.parsed.y;
                                     var m = context.dataset.label;
                                     if (['Ad Spend','Ad Sales','Total Revenue','CAC'].includes(m)) return lbl + '$' + v.toLocaleString('en-US',{maximumFractionDigits:0});
-                                    if (['TACoS (%)','CTR (%)'].includes(m)) return lbl + v.toFixed(2) + '%';
-                                    if (m === 'ROAS') return lbl + v.toFixed(2) + 'x';
+                                    if (['TACoS (%)','CTR (%)','NTB (%)'].includes(m)) return lbl + v.toFixed(2) + '%';
+                                    if (m === 'ROAS' || m === 'tROAS (x)') return lbl + v.toFixed(2) + 'x';
                                     return lbl + v.toLocaleString('en-US',{maximumFractionDigits:0});
                                 }
                             }
