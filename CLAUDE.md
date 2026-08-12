@@ -13,27 +13,29 @@ FullFocus/
 │
 ├── scrape_bsr_ff.py                    # Scrapes BSR from Amazon category page
 ├── bsr_updater_ff.py                   # Patches bsr_data into dashboard-data.js
-├── run_bsr_ff.sh                       # Cron shell: scrape BSR → update → push (6:30am PT)
 │
 ├── scrape_sov_ff.py                    # Scrapes SOV from Amazon SERP
 ├── sov_updater_ff.py                   # Patches sov_data into dashboard-data.js
-├── run_sov_ff.sh                       # Cron shell: scrape SOV → update → push (6:35am PT)
 │
 ├── scrape_price_ff.py                  # Scrapes listing prices for 5 tracked ASINs
 ├── price_updater_ff.py                 # Patches price_data into dashboard-data.js
-├── run_price_ff.sh                     # Cron shell: scrape prices → update → push (6:25am PT)
 ├── price_tracking_automation.md        # Docs for the price tracking automation
 │
-└── logs/                               # Per-run logs: bsr_YYYY-MM-DD, sov_YYYY-MM-DD, price_YYYY-MM-DD
+├── run_daily_ff.sh                     # ACTIVE cron script (6:25am PT): runs price+BSR+SOV scrapes, then ONE combined GitHub push
+├── run_price_ff.sh / run_bsr_ff.sh / run_sov_ff.sh   # DEPRECATED — no longer scheduled (see below), kept only as rollback reference
+│
+└── logs/                               # Per-run logs: daily_YYYY-MM-DD.log (current); bsr/sov/price_YYYY-MM-DD.log (old, pre-2026-07-06)
 ```
 
 ## Daily Cron Schedule (all PT)
 
+**Updated 2026-07-06:** the three separate cron jobs below were consolidated into a single script, `run_daily_ff.sh`, because each separate push was triggering its own GitHub Pages deployment — when two landed close together, GitHub rejected the second with `Deployment failed, try again later` and that commit's data never went live. See `~/.claude/projects/-Users-gisch/memory/project_daily_dashboard_automation.md` for the full incident writeup.
+
 | Time | Script | What it does |
 |------|--------|-------------|
-| 6:25am | `run_price_ff.sh` | Scrapes listing prices for 5 tracked ASINs → `price_data` |
-| 6:30am | `run_bsr_ff.sh` | Scrapes Personal Organizers BSR → `bsr_data` |
-| 6:35am | `run_sov_ff.sh` | Scrapes "daily planner" SERP → `sov_data` |
+| 6:25am | `run_daily_ff.sh` (active) | Scrapes prices, BSR, and SOV in sequence, updates `dashboard-data.js` for each, then pushes **one** combined commit to GitHub |
+
+~~6:25/6:30/6:35am separate price/BSR/SOV cron jobs~~ — replaced by the single job above. Do not re-add separate cron entries for `run_price_ff.sh` / `run_bsr_ff.sh` / `run_sov_ff.sh` — that reintroduces the deploy-collision bug.
 
 ## Monthly Data Ingest (runs every month)
 
@@ -53,8 +55,25 @@ Both files land in `~/Downloads/`. Raw files are deleted by the user after inges
 1. **Check what month is being added** — confirm the ads CSV contains rows for the target month only.
 2. **Sum `Ordered Product Sales`** from the total sales CSV → this becomes `Shipped Revenue` in `time_series`.
 3. **Run the inline incremental ingest** (see template below) — it reads `dashboard-data.js`, appends the new month's data to every array, and writes back.
-4. **Update `index.html` date defaults** — change the two `value="YYYY-MM-DD"` inputs (startDate / endDate) to the new month (e.g. `value="2026-05-01"` and `value="2026-05-31"`).
-5. **Push both files to GitHub** — `dashboard-data.js` and `index.html`.
+4. **Append the month's NTB %** — add `{"Month_Period":"YYYY-MM","ntb_pct":NN.N}` to the `ntb_data` array (see "NTB % (new to brand)" below).
+5. **Update `index.html` date defaults** — change the two `value="YYYY-MM-DD"` inputs (startDate / endDate) to the new month (e.g. `value="2026-05-01"` and `value="2026-05-31"`).
+6. **Push both files to GitHub** — `dashboard-data.js` and `index.html`.
+
+### NTB % (new to brand)
+
+`ntb_data` holds one row per month: `{"Month_Period":"2026-07","ntb_pct":71.3}`. The value is
+**Percent of sales new to brand** from the Amazon Advertising Console Performance chart (same
+place the Total cost / CPC toggles live). It is not in the search-term CSV — read it per month
+from the console, or from the monthly screenshot the user provides.
+
+`index.html` merges `ntb_data` onto matching `time_series` rows as an `NTB %` field at page load,
+which feeds two places:
+- **Overview → Custom Trend Analysis** — `NTB (%)` metric option, Monthly view only (plots on the right axis; months with no value are gapped, not zeroed)
+- **Annual Plan** — `NTB % Goal` (65%, constant `NTB_GOAL` in `renderAnnualPlanTable`) and `NTB % (Actual)` rows; the TOTAL column is weighted by ad sales, matching how Amazon aggregates the metric
+
+**Seed values Jan–Jul 2026 were read off a chart image, not exported numbers** — they are
+approximate (±1pt) except Jun (73.74%, from a tooltip). Replace any month with an exact figure
+when one is available.
 
 ### Key ingest logic (same as build_dashboard_data.py)
 
@@ -112,6 +131,7 @@ The script classifies campaigns into these strategies automatically from the cam
 | `search_term_data` | Top 50 terms by lifetime spend, monthly |
 | `asin_performance` | Monthly per-SKU with CAC |
 | `time_series` | Monthly ad totals (ROAS, CAC, CTR) |
+| `ntb_data` | Monthly % of sales new to brand — merged onto `time_series` as `NTB %` at load |
 | `daily_series` / `weekly_series` | Daily/weekly ad totals |
 | `daily_asin_series` / `weekly_asin_series` | Daily/weekly per-SKU |
 | `ad_type_monthly` | SP / SB / SD breakdown by month |
