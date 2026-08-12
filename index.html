@@ -1377,7 +1377,7 @@
         <!-- Annual Plan Tab -->
         <div id="annual-plan" class="tab-content">
             <h2 style="margin-bottom:8px;">Annual Media Plan vs. Actuals</h2>
-            <p style="color:#666;font-size:13px;margin-bottom:20px;">Plan targets vs. actual performance. <span style="background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:4px;font-weight:600;">Green</span> = on/above goal &nbsp;|&nbsp; <span style="background:#ffebee;color:#c62828;padding:2px 7px;border-radius:4px;font-weight:600;">Red</span> = below goal &nbsp;|&nbsp; tROAS goal: 5.0x</p>
+            <p style="color:#666;font-size:13px;margin-bottom:20px;">Plan targets vs. actual performance. <span style="background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:4px;font-weight:600;">Green</span> = on/above goal &nbsp;|&nbsp; <span style="background:#ffebee;color:#c62828;padding:2px 7px;border-radius:4px;font-weight:600;">Red</span> = below goal &nbsp;|&nbsp; tROAS goal: 3.5x</p>
             <div class="chart-container">
                 <div style="overflow-x:auto;">
                     <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:1100px;">
@@ -2754,7 +2754,7 @@ function renderCampaignTargetingTab() {
         function renderAnnualPlanTable() {
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             var ROAS_GOAL  = 2.5;
-            var TROAS_GOAL = 5.0;
+            var TROAS_GOAL = 3.5;
 
             // Load actuals dynamically for any 2026 month present in time_series
             var actuals = {};
@@ -2882,8 +2882,8 @@ function renderCampaignTargetingTab() {
 
             out += '<tr>';
             out += '<td style="' + TDL + PLAN + '">tROAS Goal</td>';
-            for (var m=0; m<12; m++) out += planCell('5.0x');
-            out += planCell('5.0x') + '</tr>';
+            for (var m=0; m<12; m++) out += planCell('3.5x');
+            out += planCell('3.5x') + '</tr>';
 
             out += '<tr>';
             out += '<td style="' + TDL + '">tROAS (Actual)</td>';
@@ -2909,7 +2909,7 @@ function renderCampaignTargetingTab() {
 
         function renderAnnualPlanCharts() {
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            var troasGoalLine = [5,5,5,5,5,5,5,5,5,5,5,5];
+            var troasGoalLine = [3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5,3.5];
 
             // Actuals from time_series
             var actShipRev = [null,null,null,null,null,null,null,null,null,null,null,null];
@@ -2953,7 +2953,7 @@ function renderCampaignTargetingTab() {
                     labels: months,
                     datasets: [
                         {
-                            label: 'tROAS Goal (5.0x)',
+                            label: 'tROAS Goal (3.5x)',
                             data: troasGoalLine,
                             borderColor: '#7a6238',
                             backgroundColor: 'transparent',
