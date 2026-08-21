@@ -132,6 +132,7 @@ The script classifies campaigns into these strategies automatically from the cam
 | `asin_performance` | Monthly per-SKU with CAC |
 | `time_series` | Monthly ad totals (ROAS, CAC, CTR) |
 | `ntb_data` | Monthly % of sales new to brand — merged onto `time_series` as `NTB %` at load |
+| `incrementality_data` | Monthly NTB %, CAC, ROAS split Branded vs Non-Branded — powers the Incrementality Trends tab |
 | `daily_series` / `weekly_series` | Daily/weekly ad totals |
 | `daily_asin_series` / `weekly_asin_series` | Daily/weekly per-SKU |
 | `ad_type_monthly` | SP / SB / SD breakdown by month |
@@ -139,6 +140,41 @@ The script classifies campaigns into these strategies automatically from the cam
 | `match_monthly` | By match type (Exact/Phrase/Broad/PAT/Auto) |
 | `strategy_by_group` / `match_by_group` | Lifetime cross-tabs |
 | `dow_summary` | Day-of-week performance averages |
+
+## Incrementality Trends Tab
+
+The **🚀 Incrementality Trends** tab (`index.html` → `<div id="incrementality">`, rendered by
+`renderIncrementalityTab()`) shows NTB %, CAC and ROAS by month, split Branded vs Non-Branded.
+It reads `incrementality_data` in `dashboard-data.js` and **ignores the sidebar date filter** —
+it always shows its own full range, because the sidebar defaults to a single month.
+
+**This array does NOT update from the normal monthly ingest.** It was built from a separate
+campaign-level export (columns: `report_month, campaign_id_string, campaign, spend, sales,
+ntb_sales, ntb_sales_pct, roas, cpc, cac, clicks, ntb_purchases, total_purchases`). Current
+coverage: **2025-12 through 2026-08** (Aug flagged `"partial": true`). To add a month, re-run
+the same aggregation over a fresh export and append two rows (one per targeting group).
+
+### Metric definitions (re-aggregated from raw counts, never averaged)
+
+| Metric | Formula |
+|--------|---------|
+| NTB %  | `sum(ntb_sales) / sum(sales) * 100` |
+| CAC    | `sum(spend) / sum(ntb_purchases)` |
+| ROAS   | `sum(sales) / sum(spend)` |
+
+### Branded vs Non-Branded split (from campaign name, in this order)
+
+1. `NON-BRANDED` / `NON-BRAND` in the name, or `NB` as a delimited token → **Non-Branded**
+2. `BRANDED` in the name, or `BR` as a delimited token → **Branded**
+3. `DEFENSIVE` → **Branded**
+4. `AUTO` or `SP-A` → **Non-Branded** (all auto campaigns count as non-branded)
+5. `OFFENSIVE` / `COMPETITOR` / `CATEGORY` → **Non-Branded**
+6. Anything left over → **Branded** — this only catches the three unlabeled Sponsored Display
+   remarketing/awareness campaigns (~2% of spend), which retarget people already exposed to
+   the brand. Revisit this fallback if new unlabeled campaigns appear.
+
+Rows carry a `"partial"` flag for in-progress months; the tab marks those with `*` in the table,
+dashes the trailing chart segment, and notes it in the footnote.
 
 ## Pushing Files Live to GitHub
 

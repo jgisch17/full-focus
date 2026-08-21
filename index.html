@@ -313,6 +313,13 @@
             color: #f44336;
         }
 
+        .incr-btn {
+            padding: 5px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+            border: 1px solid #d9c9a3; background: #fff; color: #555;
+            border-radius: 6px; transition: all .15s ease;
+        }
+        .incr-btn:hover { background: #f6f1e7; }
+        .incr-btn.active { background: #182840; border-color: #182840; color: #fff; }
         .chart-container {
             background: white;
             padding: 25px;
@@ -586,6 +593,7 @@
             <option value="skus">📦 SKUs</option>
             <option value="search-terms">🔍 Search Terms</option>
             <option value="cac-analysis">💰 CAC Analysis</option>
+            <option value="incrementality">🚀 Incrementality Trends</option>
             <option value="dow-analysis">📆 Day of Week</option>
             <option value="bsr-tracking">📈 BSR Tracking</option>
             <option value="sov-tracking">👁️ SOV Tracking</option>
@@ -611,6 +619,7 @@
             <div class="tab" data-tab="skus"><span class="tab-icon">📦</span><span class="tab-label">SKUs</span></div>
             <div class="tab" data-tab="search-terms"><span class="tab-icon">🔍</span><span class="tab-label">Search Terms</span></div>
             <div class="tab" data-tab="cac-analysis"><span class="tab-icon">💰</span><span class="tab-label">CAC Analysis</span></div>
+            <div class="tab" data-tab="incrementality"><span class="tab-icon">🚀</span><span class="tab-label">Incrementality Trends</span></div>
             <div class="tab" data-tab="dow-analysis"><span class="tab-icon">📆</span><span class="tab-label">Day of Week</span></div>
         </div>
 
@@ -1161,6 +1170,70 @@
                 <div style="font-size:40px; margin-bottom:12px;">🏷️</div>
                 <div style="font-size:18px; font-weight:600; color:#555; margin-bottom:8px;">No price data yet</div>
                 <div style="font-size:13px;">Run <code>bash run_price_ff.sh</code> to collect the first day's prices.</div>
+            </div>
+        </div>
+
+        <!-- Incrementality Trends Tab -->
+        <div id="incrementality" class="tab-content">
+            <h2 style="margin-bottom:6px;">Incrementality Trends</h2>
+            <p style="font-size:13px;color:#777;margin:0 0 20px;max-width:900px;">
+                New-to-brand efficiency split by campaign targeting. <strong>Branded</strong> captures demand that
+                already knows Full Focus; <strong>Non-Branded</strong> (including all auto campaigns) is where
+                genuinely incremental customers come from. This tab shows its own full date range and is not
+                affected by the date filter in the sidebar.
+            </p>
+
+            <!-- Trend Chart -->
+            <div class="chart-container" style="margin-bottom:24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+                    <h3 style="margin:0;" id="incrChartTitle">NTB % Over Time</h3>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <button id="incrBtn-ntb_pct" class="incr-btn active" onclick="setIncrMetric('ntb_pct')">NTB %</button>
+                        <button id="incrBtn-cac"     class="incr-btn"        onclick="setIncrMetric('cac')">CAC</button>
+                        <button id="incrBtn-roas"    class="incr-btn"        onclick="setIncrMetric('roas')">ROAS</button>
+                        <button id="incrBtn-spend"   class="incr-btn"        onclick="setIncrMetric('spend')">Spend</button>
+                    </div>
+                </div>
+                <div style="position:relative;height:340px;"><canvas id="incrTrendChart"></canvas></div>
+            </div>
+
+            <!-- Metric Table -->
+            <div class="chart-container" style="margin-bottom:24px;">
+                <h3 style="margin:0 0 14px;">NTB %, CAC &amp; ROAS by Month and Targeting</h3>
+                <div style="overflow-x:auto;">
+                    <table id="incrTable" class="data-table" style="min-width:820px;">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="vertical-align:bottom;">Month</th>
+                                <th colspan="3" style="text-align:center;border-left:2px solid #d9c9a3;">Branded</th>
+                                <th colspan="3" style="text-align:center;border-left:2px solid #d9c9a3;">Non-Branded</th>
+                                <th colspan="3" style="text-align:center;border-left:2px solid #d9c9a3;">Total</th>
+                            </tr>
+                            <tr>
+                                <th style="text-align:right;border-left:2px solid #d9c9a3;">NTB %</th>
+                                <th style="text-align:right;">CAC</th>
+                                <th style="text-align:right;">ROAS</th>
+                                <th style="text-align:right;border-left:2px solid #d9c9a3;">NTB %</th>
+                                <th style="text-align:right;">CAC</th>
+                                <th style="text-align:right;">ROAS</th>
+                                <th style="text-align:right;border-left:2px solid #d9c9a3;">NTB %</th>
+                                <th style="text-align:right;">CAC</th>
+                                <th style="text-align:right;">ROAS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="incrTableBody"></tbody>
+                    </table>
+                </div>
+                <p style="font-size:11.5px;color:#999;margin:14px 0 0;line-height:1.6;">
+                    <strong>How these are calculated:</strong> NTB % = NTB sales &divide; ad sales &middot;
+                    CAC = ad spend &divide; NTB purchases &middot; ROAS = ad sales &divide; ad spend.
+                    Monthly and total figures are re-aggregated from raw campaign spend, sales and purchase counts &mdash;
+                    they are not averages of the campaign-level rates.<br>
+                    <strong>Targeting split:</strong> read from the campaign name. Auto campaigns, category, competitor
+                    and offensive targeting count as Non-Branded; branded keyword, defensive and Sponsored Display
+                    remarketing campaigns count as Branded.<br>
+                    <span id="incrPartialNote"></span>
+                </p>
             </div>
         </div>
 
@@ -1796,6 +1869,7 @@
             if (tabId === 'sov-tracking') renderSOVTab();
             if (tabId === 'price-tracking') renderPriceTab();
             if (tabId === 'insights') renderInsightsTab();
+            if (tabId === 'incrementality') renderIncrementalityTab();
         }
 
         function toggleSidebar() {
@@ -2361,6 +2435,173 @@ const MATCH_COLORS = {
                     }
                 }
             });
+        }
+
+
+        /* ---------- Incrementality Trends Tab ---------- */
+        const INCR_COLORS = { 'Branded': '#182840', 'Non-Branded': '#f59e0b', 'Total': '#7a6238' };
+        const INCR_METRICS = {
+            ntb_pct: { label: 'NTB %',  title: 'NTB % Over Time',            axis: 'NTB % of ad sales', fmt: v => v.toFixed(1) + '%',  tick: v => v.toFixed(0) + '%' },
+            cac:     { label: 'CAC',    title: 'CAC Over Time',              axis: 'CAC ($ per NTB purchase)', fmt: v => '$' + v.toFixed(2), tick: v => '$' + v.toFixed(0) },
+            roas:    { label: 'ROAS',   title: 'ROAS Over Time',             axis: 'ROAS', fmt: v => v.toFixed(2) + 'x', tick: v => v.toFixed(1) + 'x' },
+            spend:   { label: 'Spend',  title: 'Ad Spend Over Time',         axis: 'Ad spend', fmt: v => '$' + Math.round(v).toLocaleString(), tick: v => '$' + (v / 1000).toFixed(0) + 'k' },
+        };
+        let incrMetric = 'ntb_pct';
+        let incrTrendChart = null;
+
+        function setIncrMetric(m) {
+            if (!INCR_METRICS[m]) return;
+            incrMetric = m;
+            Object.keys(INCR_METRICS).forEach(k => {
+                const btn = document.getElementById('incrBtn-' + k);
+                if (btn) btn.classList.toggle('active', k === m);
+            });
+            renderIncrTrendChart();
+        }
+
+        // Re-aggregate from raw counts so rates are spend/sales weighted, never an average of averages.
+        function incrAgg(rows) {
+            const t = { spend: 0, sales: 0, ntb_sales: 0, ntb_purchases: 0, total_purchases: 0, clicks: 0, partial: false };
+            rows.forEach(r => {
+                t.spend           += r.spend           || 0;
+                t.sales           += r.sales           || 0;
+                t.ntb_sales       += r.ntb_sales       || 0;
+                t.ntb_purchases   += r.ntb_purchases   || 0;
+                t.total_purchases += r.total_purchases || 0;
+                t.clicks          += r.clicks          || 0;
+                if (r.partial) t.partial = true;
+            });
+            t.ntb_pct = t.sales         ? (t.ntb_sales / t.sales) * 100 : null;
+            t.cac     = t.ntb_purchases ? t.spend / t.ntb_purchases     : null;
+            t.roas    = t.spend         ? t.sales / t.spend             : null;
+            t.empty   = rows.length === 0;
+            return t;
+        }
+
+        function incrMonths() {
+            const rows = (dashboardData && dashboardData.incrementality_data) || [];
+            return [...new Set(rows.map(r => r.Month_Period))].sort();
+        }
+
+        function incrRowsFor(month, targeting) {
+            const rows = (dashboardData && dashboardData.incrementality_data) || [];
+            return rows.filter(r => r.Month_Period === month && (targeting === 'Total' || r.targeting === targeting));
+        }
+
+        function renderIncrTrendChart() {
+            const ctx = document.getElementById('incrTrendChart');
+            if (!ctx) return;
+            const months = incrMonths();
+            const spec   = INCR_METRICS[incrMetric];
+            const titleEl = document.getElementById('incrChartTitle');
+            if (titleEl) titleEl.textContent = spec.title;
+
+            const partialIdx = months.map((m, i) => incrAgg(incrRowsFor(m, 'Total')).partial ? i : -1).filter(i => i >= 0);
+
+            const datasets = ['Branded', 'Non-Branded', 'Total'].map(g => ({
+                label: g,
+                data: months.map(m => {
+                    const a = incrAgg(incrRowsFor(m, g));
+                    return a.empty ? null : a[incrMetric];
+                }),
+                borderColor: INCR_COLORS[g],
+                backgroundColor: INCR_COLORS[g] + '22',
+                borderWidth: g === 'Total' ? 2 : 2.5,
+                borderDash: g === 'Total' ? [5, 4] : [],
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.3,
+                spanGaps: true,
+                // Dash any segment that runs into a partial (incomplete) month.
+                segment: {
+                    borderDash: seg => (partialIdx.includes(seg.p1DataIndex) && g !== 'Total') ? [3, 3] : undefined
+                }
+            }));
+
+            if (incrTrendChart) incrTrendChart.destroy();
+            incrTrendChart = new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: { labels: months.map(m => fmtMonth(m) + (partialIdx.includes(months.indexOf(m)) ? '*' : '')), datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, usePointStyle: true, font: { size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: c => {
+                                    if (c.parsed.y === null) return null;
+                                    const m = months[c.dataIndex];
+                                    const a = incrAgg(incrRowsFor(m, c.dataset.label));
+                                    return `${c.dataset.label}: ${spec.fmt(c.parsed.y)}   (spend $${Math.round(a.spend).toLocaleString()})`;
+                                },
+                                afterTitle: t => partialIdx.includes(t[0].dataIndex) ? 'Partial month — data still accruing' : ''
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { maxRotation: 45 } },
+                        y: {
+                            beginAtZero: incrMetric !== 'roas',
+                            title: { display: true, text: spec.axis, font: { size: 12 } },
+                            ticks: { callback: spec.tick }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderIncrTable() {
+            const body = document.getElementById('incrTableBody');
+            if (!body) return;
+            const months = incrMonths();
+            const dash = '<td style="text-align:right;color:#ccc;">–</td>';
+
+            const cells = (a, firstBorder) => {
+                const bl = firstBorder ? 'border-left:2px solid #d9c9a3;' : '';
+                if (a.empty) return `<td style="text-align:right;color:#ccc;${bl}">–</td>${dash}${dash}`;
+                return `<td style="text-align:right;${bl}">${a.ntb_pct === null ? '–' : a.ntb_pct.toFixed(1) + '%'}</td>` +
+                       `<td style="text-align:right;">${a.cac  === null ? '–' : '$' + a.cac.toFixed(2)}</td>` +
+                       `<td style="text-align:right;">${a.roas === null ? '–' : a.roas.toFixed(2) + 'x'}</td>`;
+            };
+
+            let html = '';
+            let anyPartial = false;
+            months.forEach(m => {
+                const tot = incrAgg(incrRowsFor(m, 'Total'));
+                if (tot.partial) anyPartial = true;
+                const lbl = fmtMonth(m) + (tot.partial ? ' <span style="color:#b8860b;font-weight:600;">*</span>' : '');
+                html += `<tr><td style="font-weight:600;white-space:nowrap;">${lbl}</td>` +
+                        cells(incrAgg(incrRowsFor(m, 'Branded')), true) +
+                        cells(incrAgg(incrRowsFor(m, 'Non-Branded')), true) +
+                        cells(tot, true) + '</tr>';
+            });
+
+            // Weighted grand total across every month in the dataset.
+            const all = (dashboardData && dashboardData.incrementality_data) || [];
+            const tr = (t) => all.filter(r => t === 'Total' || r.targeting === t);
+            html += '<tr style="background:#f6f1e7;font-weight:700;border-top:2px solid #d9c9a3;">' +
+                    '<td style="font-weight:700;">TOTAL</td>' +
+                    cells(incrAgg(tr('Branded')), true) +
+                    cells(incrAgg(tr('Non-Branded')), true) +
+                    cells(incrAgg(tr('Total')), true) + '</tr>';
+
+            body.innerHTML = html;
+
+            const note = document.getElementById('incrPartialNote');
+            if (note) note.innerHTML = anyPartial
+                ? '<span style="color:#b8860b;font-weight:600;">*</span> Partial month — the period is still in progress, so spend and sales are incomplete. Rates are directional only.'
+                : '';
+        }
+
+        function renderIncrementalityTab() {
+            if (!dashboardData || !dashboardData.incrementality_data || !dashboardData.incrementality_data.length) {
+                const body = document.getElementById('incrTableBody');
+                if (body) body.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#999;">No incrementality data loaded.</td></tr>';
+                return;
+            }
+            renderIncrTable();
+            renderIncrTrendChart();
         }
 
         function toggleCampaignExpand(gi) {
