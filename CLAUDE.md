@@ -61,19 +61,35 @@ Both files land in `~/Downloads/`. Raw files are deleted by the user after inges
 
 ### NTB % (new to brand)
 
-`ntb_data` holds one row per month: `{"Month_Period":"2026-07","ntb_pct":71.3}`. The value is
-**Percent of sales new to brand** from the Amazon Advertising Console Performance chart (same
-place the Total cost / CPC toggles live). It is not in the search-term CSV — read it per month
-from the console, or from the monthly screenshot the user provides.
+`ntb_data` holds one row per month: `{"Month_Period":"2026-08","ntb_pct":68.7}`.
+
+**The value is the Sponsored Brands NTB sales rate — and it IS computable from the search-term
+CSV** (discovered 2026-09-02, correcting the earlier "not in the CSV, read it off the console"
+note). The export carries `Sales (new to brand)` and `Purchases (new to brand)` columns, but
+**Amazon only populates them on Sponsored Brands rows** — SP and SD rows are always blank. So:
+
+```
+ntb_pct = sum(Sales (new to brand)) / sum(Sales)   over rows where Ad product == "Sponsored Brands"
+```
+
+Aug 2026 checks out at 68.70%, squarely inside the 57.7–73.7% band of the chart-read Jan–Jul
+seeds, whereas the account-wide figure (NTB sales / *all* sales) is only 10.69% — an order of
+magnitude off. That gap is what identifies the console's Performance chart metric as the
+SB-only rate. Compute it during ingest; no screenshot needed.
 
 `index.html` merges `ntb_data` onto matching `time_series` rows as an `NTB %` field at page load,
 which feeds two places:
 - **Overview → Custom Trend Analysis** — `NTB (%)` metric option, Monthly view only (plots on the right axis; months with no value are gapped, not zeroed)
 - **Annual Plan** — `NTB % Goal` (65%, constant `NTB_GOAL` in `renderAnnualPlanTable`) and `NTB % (Actual)` rows; the TOTAL column is weighted by ad sales, matching how Amazon aggregates the metric
 
-**Seed values Jan–Jul 2026 were read off a chart image, not exported numbers** — they are
-approximate (±1pt) except Jun (73.74%, from a tooltip). Replace any month with an exact figure
-when one is available.
+**Jan–Jul 2026 were read off a chart image and remain approximate (±1pt)** except Jun (73.74%,
+from a tooltip). Aug 2026 onward are exact CSV-derived figures. If a raw ads CSV for any Jan–Jul
+month ever resurfaces, recompute that month with the formula above and overwrite the seed.
+
+> **Do not confuse `ntb_data` with `incrementality_data`'s `ntb_pct`.** They are different
+> metrics from different exports. `incrementality_data` comes from a campaign-level export whose
+> NTB columns are populated across SP *and* SB (Aug branded ntb_sales alone exceeds the entire
+> SB-only NTB sales for the month), so it cannot be rebuilt from the search-term CSV.
 
 ### Key ingest logic (same as build_dashboard_data.py)
 
@@ -91,13 +107,15 @@ when one is available.
 
 ### Data already ingested (historical)
 
-All months through **2026-05** are in `dashboard-data.js`. Historical raw CSVs no longer exist — always use incremental ingest going forward, never a full rebuild.
+Data covers **Jan 2025 through 2026-08**. Historical raw CSVs no longer exist — always use
+incremental ingest, never a full rebuild. This table goes stale fast; trust the live
+`time_series` array's last `Month_Period` over anything written here.
 
 | Period covered | Notes |
 |----------------|-------|
 | Jan 2025 | Monthly granularity |
-| Feb–Dec 2025 | Daily granularity |
-| Jan–May 2026 | Daily granularity; Jan–May have Shipped Revenue populated |
+| Feb–Dec 2025 | Daily granularity, no Shipped Revenue |
+| Jan–Aug 2026 | Daily granularity; Shipped Revenue populated |
 
 ## Product Mapping
 
@@ -218,8 +236,8 @@ HTTP 200 = updated, 201 = created. The same token is shared with the Stargazer p
 
 ## Important Notes
 
-- `dashboard-data.js` is generated — always rebuild via `build_dashboard_data.py`, never edit manually
-- `Shipped COGS` and `Shipped Revenue` in `time_series` are currently `0` — populate from business data when available
+- `dashboard-data.js` is generated — never hand-edit. Do **not** re-run `build_dashboard_data.py` either; it is a full-rebuild script and the historical raw CSVs are gone. Use the incremental inline ingest above.
+- `Shipped COGS` and `TACoS` in `time_series` are still `0`; `Shipped Revenue` is populated from the monthly total-sales CSV
 - The search term table is capped at the top 50 terms by lifetime spend to keep file size manageable
 - No web server needed; `index.html` loads `dashboard-data.js` from the same directory
 
