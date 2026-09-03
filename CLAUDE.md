@@ -14,8 +14,8 @@ FullFocus/
 ├── scrape_bsr_ff.py                    # Scrapes BSR from Amazon category page
 ├── bsr_updater_ff.py                   # Patches bsr_data into dashboard-data.js
 │
-├── scrape_sov_ff.py                    # Scrapes SOV from Amazon SERP
-├── sov_updater_ff.py                   # Patches sov_data into dashboard-data.js
+├── scrape_sov_ff.py                    # Scrapes SOV from Amazon SERP for every keyword in its KEYWORDS list
+├── sov_updater_ff.py                   # Patches sov_data into dashboard-data.js (all keywords)
 │
 ├── scrape_price_ff.py                  # Scrapes listing prices for 5 tracked ASINs
 ├── price_updater_ff.py                 # Patches price_data into dashboard-data.js
@@ -36,6 +36,62 @@ FullFocus/
 | 6:25am | `run_daily_ff.sh` (active) | Scrapes prices, BSR, and SOV in sequence, updates `dashboard-data.js` for each, then pushes **one** combined commit to GitHub |
 
 ~~6:25/6:30/6:35am separate price/BSR/SOV cron jobs~~ — replaced by the single job above. Do not re-add separate cron entries for `run_price_ff.sh` / `run_bsr_ff.sh` / `run_sov_ff.sh` — that reintroduces the deploy-collision bug.
+
+## Share of Voice (SOV) Tracking
+
+### Tracked keywords
+
+`scrape_sov_ff.py` has a `KEYWORDS` list — the single source of truth for what gets scraped:
+
+| Keyword | Status | Since |
+|---------|--------|-------|
+| `full focus planner` | active | 2026-09-03 |
+| `michael hyatt` | active | 2026-09-03 |
+| `daily planner` | **retired** — history kept, no new points | tracked 2026-05-08 → 2026-09-03 |
+
+To add a keyword: append it to `KEYWORDS` in `scrape_sov_ff.py`. The updater creates its
+`sov_data` entry automatically, backfilled with empty slots, and the dashboard's keyword
+dropdown picks it up with no HTML change.
+
+To retire a keyword: remove it from `KEYWORDS`, add it to `RETIRED_KEYWORDS` in
+`sov_updater_ff.py`, and add it to `SOV_RETIRED` in `index.html` (which appends the
+"(paused)" label and sorts it below the active keywords).
+
+### Data shape and the alignment rule
+
+`sov_data` is `{"dates": [...], "keywords": [{keyword, organic_positions, paid_positions,
+organic_total, paid_total, organic_sov, paid_sov, total_sov, organic_asins, paid_asins}]}`.
+
+**`dates` is one array shared by every keyword entry.** Every per-keyword array must stay
+exactly `len(dates)` long, so appending a date means appending a slot to EVERY keyword —
+including retired keywords and keywords whose scrape failed that day (they get an empty
+slot: `[]` / `0` / `null`). Skip that padding and the arrays drift out of alignment with the
+date axis, and every chart silently misplots against the wrong dates. `sov_updater_ff.py`
+enforces this: it realigns short arrays on load and aborts without writing if any array
+length mismatches after the update.
+
+SOV % is always "Full Focus's share of that page" — the same `FF_ASINS` set is used for
+every keyword.
+
+### Partial success and re-runs
+
+`scrape_sov_ff.py` scrapes each keyword in one browser session, spaced 20-40s apart, and
+returns `{"<keyword>": {"organic": [...], "paid": [...]} | null}`. A keyword that fails all
+3 retries comes back `null`; the keywords that succeeded are still recorded. The scraper
+exits non-zero only when EVERY keyword failed.
+
+If today's date is already in `dates` (e.g. the morning cron ran, or a keyword is being
+re-run after a partial scrape), the updater **fills the existing slot in place** rather than
+appending a duplicate date. A keyword that already has data for today is left untouched.
+
+### Known failure mode
+
+Amazon soft-blocks the `/s` search endpoint (HTTP 503, "Sorry! Something went wrong!") far
+more aggressively than the `/dp` and `/gp/bestsellers` endpoints price/BSR use. When
+`sov-scrape` is the ONLY failure in the daily run, `run_daily_ff.sh` suppresses the alert
+email and logs `"sov-only failure — alert suppressed"`. It still alerts if SOV fails
+alongside price/BSR/push, which would suggest a broader block. Do not "fix" the scraper in
+response to an isolated SOV failure — confirm the 503 signature first.
 
 ## Monthly Data Ingest (runs every month)
 

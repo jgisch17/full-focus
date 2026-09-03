@@ -1101,10 +1101,13 @@
         <div id="sov-tracking" class="tab-content">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
                 <div>
-                    <h2 style="margin:0; font-size:20px; color:#333;">Share of Voice — "daily planner"</h2>
-                    <div style="font-size:13px; color:#888; margin-top:3px;">Amazon page 1 organic + paid placements · updated daily at 6:35am PT</div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h2 style="margin:0; font-size:20px; color:#333;">Share of Voice</h2>
+                        <select id="sovKeywordSelect" style="padding:6px 10px; font-size:14px; border:1px solid #d1d5db; border-radius:6px; background:#fff; color:#333; cursor:pointer;"></select>
+                    </div>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">Amazon page 1 organic + paid placements · updated daily at 6:25am PT</div>
                 </div>
-                <div id="sovDaysLabel" style="font-size:13px; color:#888;"></div>
+                <div id="sovDaysLabel" style="font-size:13px; color:#888; text-align:right;"></div>
             </div>
 
             <!-- KPI row -->
@@ -1112,7 +1115,7 @@
 
             <!-- Trend chart -->
             <div class="chart-card" style="margin-bottom:20px;">
-                <div class="chart-title">SOV Trend Over Time</div>
+                <div class="chart-title" id="sovTrendTitle">SOV Trend Over Time</div>
                 <div style="position:relative; height:280px;">
                     <canvas id="sovTrendChart"></canvas>
                 </div>
@@ -1121,11 +1124,11 @@
             <!-- Today's page 1 grid + found products side by side -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
                 <div class="chart-card">
-                    <div class="chart-title">Today's Page 1 Position Map</div>
+                    <div class="chart-title" id="sovMapTitle">Page 1 Position Map</div>
                     <div id="sovPositionMap" style="font-size:12px;"></div>
                 </div>
                 <div class="chart-card">
-                    <div class="chart-title">Full Focus Products Found Today</div>
+                    <div class="chart-title" id="sovProdTitle">Full Focus Products Found</div>
                     <div id="sovProductsFound"></div>
                 </div>
             </div>
@@ -1134,7 +1137,7 @@
             <div id="sovEmpty" style="display:none; text-align:center; padding:60px 0; color:#999;">
                 <div style="font-size:40px; margin-bottom:12px;">👁️</div>
                 <div style="font-size:18px; font-weight:600; color:#555; margin-bottom:8px;">No SOV data yet</div>
-                <div style="font-size:13px;">Run <code>bash run_sov_ff.sh</code> to collect the first day's data.</div>
+                <div style="font-size:13px;">Runs daily at 6:25am PT via <code>run_daily_ff.sh</code>.</div>
             </div>
         </div>
 
@@ -1634,30 +1637,81 @@
         }
 
 
+        // Keywords retired from active scraping — history stays, no new points.
+        const SOV_RETIRED = ['daily planner'];
+        let sovSelectedKeyword = null;
+
+        function sovKeywordLabel(k) {
+            return SOV_RETIRED.includes(k) ? k + ' (paused)' : k;
+        }
+
+        // True if this keyword has a real reading at index i (not an empty slot).
+        function sovHasData(kw, i) {
+            return !!(kw.organic_total[i] || kw.paid_total[i] ||
+                      kw.organic_sov[i] !== null || kw.paid_sov[i] !== null);
+        }
+
+        // Last index at which this keyword actually has a reading. Paused keywords
+        // and failed-scrape days leave empty slots at the end of the array, so the
+        // newest date is not necessarily the newest reading.
+        function sovLastDataIdx(kw) {
+            for (let i = kw.total_sov.length - 1; i >= 0; i--) {
+                if (sovHasData(kw, i)) return i;
+            }
+            return -1;
+        }
+
         function renderSOVTab() {
-            const sovData = (dashboardData.sov_data) || {dates:[], keywords:[]};
-            const dates   = sovData.dates || [];
-            const kw      = (sovData.keywords || []).find(k => k.keyword === 'daily planner');
+            const sovData  = (dashboardData.sov_data) || {dates:[], keywords:[]};
+            const dates    = sovData.dates || [];
+            const keywords = sovData.keywords || [];
 
             const empty      = document.getElementById('sovEmpty');
             const kpiRow     = document.getElementById('sovKpiRow');
             const daysLabel  = document.getElementById('sovDaysLabel');
+            const select     = document.getElementById('sovKeywordSelect');
 
-            function showEmpty() {
+            function showEmpty(msg) {
                 empty.style.display = 'block';
+                const head = empty.querySelector('div:nth-child(2)');
+                if (head) head.textContent = msg || 'No SOV data yet';
                 kpiRow.style.display = 'none';
                 document.querySelectorAll('#sov-tracking .chart-card').forEach(el => el.style.display = 'none');
-                document.getElementById('sovPositionMap').closest('.chart-card') && null;
             }
 
-            if (!dates.length || !kw) { showEmpty(); return; }
+            if (!dates.length || !keywords.length) { showEmpty(); return; }
+
+            // Populate the selector once; active keywords first, paused ones last.
+            const ordered = keywords.slice().sort((a, b) =>
+                (SOV_RETIRED.includes(a.keyword) ? 1 : 0) - (SOV_RETIRED.includes(b.keyword) ? 1 : 0));
+            if (select && select.options.length !== ordered.length) {
+                select.innerHTML = ordered.map(k =>
+                    '<option value="' + k.keyword + '">' + sovKeywordLabel(k.keyword) + '</option>').join('');
+                select.onchange = () => { sovSelectedKeyword = select.value; renderSOVTab(); };
+            }
+            if (!sovSelectedKeyword || !keywords.some(k => k.keyword === sovSelectedKeyword)) {
+                sovSelectedKeyword = ordered[0].keyword;
+            }
+            if (select) select.value = sovSelectedKeyword;
+
+            const kw = keywords.find(k => k.keyword === sovSelectedKeyword);
+            if (!kw) { showEmpty(); return; }
+
+            const lastIdx = sovLastDataIdx(kw);
+            if (lastIdx < 0) {
+                showEmpty('No SOV data yet for "' + sovSelectedKeyword + '"');
+                return;
+            }
+
             empty.style.display = 'none';
             kpiRow.style.display = 'flex';
             document.querySelectorAll('#sov-tracking .chart-card').forEach(el => el.style.display = '');
 
-            daysLabel.textContent = dates.length + ' days tracked · Last: ' + dates[dates.length - 1];
-
-            const lastIdx    = dates.length - 1;
+            let daysWithData = 0;
+            for (let i = 0; i < dates.length; i++) if (sovHasData(kw, i)) daysWithData++;
+            const stale = lastIdx < dates.length - 1;
+            daysLabel.innerHTML = daysWithData + ' days tracked · Last reading: ' + dates[lastIdx] +
+                (stale ? '<div style="font-size:11px;color:#f59e0b;">not collected since then</div>' : '');
             const orgSOV     = kw.organic_sov[lastIdx];
             const paidSOV    = kw.paid_sov[lastIdx];
             const totSOV     = kw.total_sov[lastIdx];
@@ -1668,16 +1722,20 @@
             const orgTotal   = kw.organic_total[lastIdx] || 0;
             const paidTotal  = kw.paid_total[lastIdx] || 0;
 
-            const prevOrgSOV  = lastIdx > 0 ? kw.organic_sov[lastIdx-1]  : null;
-            const prevPaidSOV = lastIdx > 0 ? kw.paid_sov[lastIdx-1]     : null;
-            const prevTotSOV  = lastIdx > 0 ? kw.total_sov[lastIdx-1]    : null;
+            // Compare against the previous day that actually has a reading, so a
+            // failed-scrape gap doesn't show up as a phantom drop to zero.
+            let prevIdx = -1;
+            for (let i = lastIdx - 1; i >= 0; i--) { if (sovHasData(kw, i)) { prevIdx = i; break; } }
+            const prevOrgSOV  = prevIdx >= 0 ? kw.organic_sov[prevIdx]  : null;
+            const prevPaidSOV = prevIdx >= 0 ? kw.paid_sov[prevIdx]     : null;
+            const prevTotSOV  = prevIdx >= 0 ? kw.total_sov[prevIdx]    : null;
 
             function fmtSov(v) { return v !== null && v !== undefined ? v.toFixed(1) + '%' : '—'; }
             function deltaHtml(cur, prev) {
                 if (cur === null || prev === null || prev === undefined) return '';
                 const d = (cur - prev).toFixed(1);
-                if (d > 0)  return `<div style="font-size:11px;color:#22c55e;margin-top:4px;">+${d}pp vs yesterday</div>`;
-                if (d < 0)  return `<div style="font-size:11px;color:#ef4444;margin-top:4px;">${d}pp vs yesterday</div>`;
+                if (d > 0)  return `<div style="font-size:11px;color:#22c55e;margin-top:4px;">+${d}pp vs prior reading</div>`;
+                if (d < 0)  return `<div style="font-size:11px;color:#ef4444;margin-top:4px;">${d}pp vs prior reading</div>`;
                 return `<div style="font-size:11px;color:#888;margin-top:4px;">No change</div>`;
             }
 
@@ -1704,12 +1762,24 @@
                 <div class="metric-card" style="min-width:160px;flex:1;">
                     <div class="metric-label">Best Organic Position</div>
                     <div class="metric-value" style="font-size:28px;">${orgPos.length ? '#'+Math.min(...orgPos) : '—'}</div>
-                    <div style="font-size:11px;color:#888;">today's page 1</div>
+                    <div style="font-size:11px;color:#888;">latest reading</div>
                 </div>`;
 
+            const trendTitle = document.getElementById('sovTrendTitle');
+            const mapTitle   = document.getElementById('sovMapTitle');
+            const prodTitle  = document.getElementById('sovProdTitle');
+            if (trendTitle) trendTitle.textContent = 'SOV Trend Over Time — "' + sovSelectedKeyword + '"';
+            if (mapTitle)   mapTitle.textContent   = 'Page 1 Position Map — ' + dates[lastIdx];
+            if (prodTitle)  prodTitle.textContent  = 'Full Focus Products Found — ' + dates[lastIdx];
+
             // ── Trend chart ───────────────────────────────────────────────────
-            const displayDates = dates.length > 60 ? dates.slice(-60) : dates;
-            const sliceFrom    = dates.length - displayDates.length;
+            // Start the axis at this keyword's first reading, so a newly added
+            // keyword doesn't render one lonely dot at the right edge of a
+            // 60-day axis it has no history for.
+            let firstDataIdx = 0;
+            for (let i = 0; i < dates.length; i++) { if (sovHasData(kw, i)) { firstDataIdx = i; break; } }
+            const sliceFrom    = Math.max(firstDataIdx, dates.length - 60);
+            const displayDates = dates.slice(sliceFrom);
 
             const ctxSOV = document.getElementById('sovTrendChart');
             if (charts.sovTrendChart) charts.sovTrendChart.destroy();
@@ -1832,7 +1902,7 @@
             };
             let prodHtml = '';
             if (!orgAsins.length && !paidAsins.length) {
-                prodHtml = '<div style="color:#999;font-size:13px;padding:20px 0;">No Full Focus products found on page 1 today.</div>';
+                prodHtml = '<div style="color:#999;font-size:13px;padding:20px 0;">No Full Focus products found on page 1 for this keyword.</div>';
             } else {
                 prodHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
                 prodHtml += '<tr style="background:#f8f9fa;"><th style="padding:8px;text-align:left;color:#555;border-bottom:1px solid #e2e8f0;">Product</th><th style="padding:8px;text-align:center;color:#555;border-bottom:1px solid #e2e8f0;">Position</th><th style="padding:8px;text-align:center;color:#555;border-bottom:1px solid #e2e8f0;">Type</th></tr>';
