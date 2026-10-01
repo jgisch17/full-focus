@@ -237,8 +237,16 @@ it always shows its own full range, because the sidebar defaults to a single mon
 **This array does NOT update from the normal monthly ingest.** It was built from a separate
 campaign-level export (columns: `report_month, campaign_id_string, campaign, spend, sales,
 ntb_sales, ntb_sales_pct, roas, cpc, cac, clicks, ntb_purchases, total_purchases`). Current
-coverage: **2025-12 through 2026-08** (Aug flagged `"partial": true`). To add a month, re-run
+coverage: **2025-12 through 2026-09** (all complete). To add a month, re-run
 the same aggregation over a fresh export and append two rows (one per targeting group).
+
+**Export format drifts.** The 2026-10-01 export was wide — `campaign, campaign_id_string,
+ad_product_type, ntb_sales_<mon>, total_sales_<mon>, ntb_sales_pct_<mon>` for two months
+(prior + current) — and carries ONLY `ntb_sales` / `total_sales`. Build each row as:
+`sales`/`ntb_sales` from the export; `spend`/`clicks`/`total_purchases`/`campaigns` from
+`campaign_data` for that month (same Branded/NB classifier). This reproduces prior rows exactly.
+When the export repeats the prior month, **restate that month** with the newer figures
+(attribution matures; Aug moved ~1%). It omits most Sponsored Display campaigns (~$200 sales/mo).
 
 ### Metric definitions (re-aggregated from raw counts, never averaged)
 
