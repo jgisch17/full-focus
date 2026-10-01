@@ -93,6 +93,18 @@ email and logs `"sov-only failure — alert suppressed"`. It still alerts if SOV
 alongside price/BSR/push, which would suggest a broader block. Do not "fix" the scraper in
 response to an isolated SOV failure — confirm the 503 signature first.
 
+### Synthetic (backfilled) SOV days
+
+`sov_data` can't carry a `backfilled_dates` marker — `sov_updater_ff.py` strips any
+top-level key other than `dates`/`keywords` — so SOV backfills are recorded here:
+
+| Dates | Cause | Filled with |
+|-------|-------|-------------|
+| 2026-09-23 .. 09-26 | Mac mini offline (`ERR_INTERNET_DISCONNECTED`) | last real reading carried forward: `full focus planner` from 09-22, `michael hyatt` from 09-21 (its 09-22 scrape was soft-blocked; that gap is real and left empty) |
+
+`price_data` and `bsr_data` for the same dates carry their own `backfilled_dates` markers.
+Script: `/Volumes/GISCH SSD/CLAUDE/backfill_outage_20260927.py`.
+
 ## Monthly Data Ingest (runs every month)
 
 This is the standard process for adding a new month of data. Raw CSV files are downloaded, ingested, then deleted — they are never stored long-term.
@@ -163,7 +175,7 @@ month ever resurfaces, recompute that month with the formula above and overwrite
 
 ### Data already ingested (historical)
 
-Data covers **Jan 2025 through 2026-08**. Historical raw CSVs no longer exist — always use
+Data covers **Jan 2025 through 2026-09**. Historical raw CSVs no longer exist — always use
 incremental ingest, never a full rebuild. This table goes stale fast; trust the live
 `time_series` array's last `Month_Period` over anything written here.
 
@@ -171,7 +183,7 @@ incremental ingest, never a full rebuild. This table goes stale fast; trust the 
 |----------------|-------|
 | Jan 2025 | Monthly granularity |
 | Feb–Dec 2025 | Daily granularity, no Shipped Revenue |
-| Jan–Aug 2026 | Daily granularity; Shipped Revenue populated |
+| Jan–Sep 2026 | Daily granularity; Shipped Revenue populated |
 
 ## Product Mapping
 
@@ -289,6 +301,10 @@ curl -s -o /tmp/ff_github_response.json -w "%{http_code}" \
 ```
 
 HTTP 200 = updated, 201 = created. The same token is shared with the Stargazer project.
+
+Pushing two files back-to-back triggers two Pages builds; the first often fails with `Page build failed.`
+That is harmless as long as the **latest** build (which deploys the full tree) shows `built` — check
+`/repos/jgisch17/full-focus/pages/builds/latest` and grep the live `dashboard-data.js` before calling it done.
 
 ## Important Notes
 
